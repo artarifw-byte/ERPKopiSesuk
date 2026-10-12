@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Eye, EyeOff, Cat, ShieldCheck, LogIn, Layers, BarChart3, PackageCheck, AlertCircle } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
-export const LoginPage = ({ onLogin }) => {
+export const LoginPage = ({ onLogin, configurationError = '' }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -11,6 +11,7 @@ export const LoginPage = ({ onLogin }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (configurationError || !supabase) return;
     setError("");
     setLoading(true);
     const { data, error: authError } = await supabase.auth.signInWithPassword({
@@ -112,14 +113,14 @@ export const LoginPage = ({ onLogin }) => {
                 </div>
               </div>
               {/* Error */}
-              {error && (
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.75rem 1rem", background: "#FEF2F2", border: "1.5px solid #FCA5A5", borderRadius: "0.75rem", marginBottom: "1.25rem" }}>
+              {(error || configurationError) && (
+                <div role="alert" style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.75rem 1rem", background: "#FEF2F2", border: "1.5px solid #FCA5A5", borderRadius: "0.75rem", marginBottom: "1.25rem" }}>
                   <AlertCircle style={{ width: "16px", height: "16px", color: "#DC2626", flexShrink: 0 }} />
-                  <span style={{ fontSize: "0.8125rem", color: "#B91C1C", fontWeight: 600 }}>{error}</span>
+                  <span style={{ fontSize: "0.8125rem", color: "#B91C1C", fontWeight: 600 }}>{error || configurationError}</span>
                 </div>
               )}
               {/* Submit */}
-              <button type="submit" disabled={loading} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", padding: "0.875rem", borderRadius: "0.875rem", fontSize: "0.9375rem", fontWeight: 800, border: "none", cursor: loading ? "not-allowed" : "pointer", background: loading ? "#94A3B8" : "linear-gradient(135deg, #0284C7 0%, #0369A1 60%, #1D4ED8 100%)", color: "#FFFFFF", boxShadow: loading ? "none" : "0 6px 20px rgba(2,132,199,0.38)", letterSpacing: "-0.01em" }}>
+              <button type="submit" disabled={loading || !!configurationError} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", padding: "0.875rem", borderRadius: "0.875rem", fontSize: "0.9375rem", fontWeight: 800, border: "none", cursor: loading || configurationError ? "not-allowed" : "pointer", background: loading || configurationError ? "#94A3B8" : "linear-gradient(135deg, #0284C7 0%, #0369A1 60%, #1D4ED8 100%)", color: "#FFFFFF", boxShadow: loading || configurationError ? "none" : "0 6px 20px rgba(2,132,199,0.38)", letterSpacing: "-0.01em" }}>
                 {loading ? (
                   <><span style={{ width: "18px", height: "18px", border: "2.5px solid rgba(255,255,255,0.4)", borderTopColor: "#FFFFFF", borderRadius: "9999px", animation: "spin 0.8s linear infinite", display: "inline-block", flexShrink: 0 }} />Memverifikasi...</>
                 ) : (

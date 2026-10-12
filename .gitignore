@@ -29,3 +29,6 @@ dist-ssr
 
 # Dev scripts (not needed in prod)
 scripts/
+
+# Local Netlify folder
+.netlify
