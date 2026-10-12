@@ -1,4 +1,29 @@
-# React + Vite
+# Kopi Sesuk ERP
+
+## Deployment configuration
+
+This React application is deployed on Netlify with Vite. `netlify.toml` sets the
+build command and `dist` publish directory and serves the application for routes
+such as `/login` and `/dashboard`, including direct visits and page refreshes.
+
+The site's Netlify build settings must also use `npm run build` as the build
+command and `dist` as the publish directory. Deploy the generated `dist` folder,
+not the repository root. If the deployed HTML still references `/src/main.jsx`,
+the deployment contains uncompiled source; browsers cannot execute that JSX
+entry point. Updating environment variables alone cannot fix a source-only
+deployment. Publish a new built deployment after correcting the site settings.
+
+Configure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the site's Netlify
+environment settings with availability during builds, then redeploy. Vite embeds
+these settings at build time; changing them requires a new deployment. Use only
+the browser-safe Supabase anon/publishable key, never a service-role or secret key.
+For local development, set these variables in an untracked `.env.local` file.
+
+If either setting is missing or client initialization fails, the login page
+displays a configuration notice and disables sign-in instead of crashing to a
+blank page. No credentials or configuration values are shown in that notice.
+
+## React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 

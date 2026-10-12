@@ -17,7 +17,7 @@ import { StockInModal } from './components/StockInModal';
 import { OpexModal } from './components/OpexModal';
 import { ReceiptModal } from './components/ReceiptModal';
 import { LoginPage } from './components/LoginPage';
-import { supabase } from './lib/supabase';
+import { supabase, supabaseConfigurationError } from './lib/supabase';
 import { CheckCircle2, AlertCircle, Info, Database } from 'lucide-react';
 
 const MainApp = ({ currentUser, onLogout }) => {
@@ -153,14 +153,18 @@ const MainApp = ({ currentUser, onLogout }) => {
 };
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(undefined); // undefined = loading
+  const [currentUser, setCurrentUser] = useState(supabase ? undefined : null); // undefined = loading
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!supabase) return;
+
     // Cek session yang sudah ada
     supabase.auth.getSession().then(({ data: { session } }) => {
       setCurrentUser(session?.user ?? null);
+    }).catch(() => {
+      setCurrentUser(null);
     });
 
     // Listen perubahan auth state (login/logout)
@@ -211,7 +215,7 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <LoginPage onLogin={handleLogin} />;
+    return <LoginPage onLogin={handleLogin} configurationError={supabaseConfigurationError} />;
   }
 
   return (
