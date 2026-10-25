@@ -1237,8 +1237,67 @@ export const ERPProvider = ({ children }) => {
   };
 
   const resetData = async () => {
-    await fetchAllFromSupabase();
-    showToast('Data berhasil disinkronisasi ulang langsung dari Supabase!', 'info');
+    try {
+      showToast('Menghapus semua data transaksi...', 'info');
+
+      // Urutan delete penting: child tables first (foreign key constraints)
+      const deleteResults = await Promise.allSettled([
+        supabase.from('journal_items').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('inventory_transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('audit_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+      ]);
+
+      // Setelah child tables bersih, hapus parent tables
+      await Promise.allSettled([
+        supabase.from('journal_entries').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('orders').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('opex_expenses').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+      ]);
+
+      // Log errors jika ada
+      deleteResults.forEach((r, i) => {
+        if (r.status === 'rejected') console.warn(`Delete step ${i} failed:`, r.reason);
+      });
+
+      // Bersihkan localStorage audit
+      localStorage.removeItem('ks_audit_logs');
+      setAuditLogs([]);
+
+      // Reload semua data dari Supabase
+      const [
+        { data: coaData },
+        { data: materialsData },
+        { data: productsData },
+        { data: variantsData },
+        { data: bomData },
+      ] = await Promise.all([
+        supabase.from('chart_of_accounts').select('*').order('code'),
+        supabase.from('raw_materials').select('*').order('name'),
+        supabase.from('products').select('*').order('name'),
+        supabase.from('product_variants').select('*'),
+        supabase.from('bom_recipes').select('*'),
+      ]);
+
+      // Update state lokal: data master tetap, data transaksi dikosongkan
+      if (coaData) setCoa(coaData);
+      if (materialsData) setMaterials(materialsData);
+      if (productsData && variantsData) {
+        setProducts(productsData.map(p => ({
+          ...p,
+          variants: variantsData.filter(v => v.product_id === p.id)
+        })));
+      }
+      if (bomData) setBom(bomData);
+      setOrders([]);
+      setOpex([]);
+      setJournal([]);
+
+      showToast('✅ Semua data transaksi berhasil dihapus. Database bersih!', 'success');
+    } catch (err) {
+      console.error('resetData error:', err);
+      showToast('Gagal reset data: ' + (err.message || 'Unknown error'), 'error');
+    }
   };
 
   return (
