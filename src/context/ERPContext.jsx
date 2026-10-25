@@ -87,6 +87,7 @@ export const ERPProvider = ({ children }) => {
         '/orders': 'PO Schedule & Sales Management',
         '/inventory': 'Stok & Inventory Control',
         '/bom': 'Resep BOM (Takaran Matrix)',
+        '/opex': 'Beban OPEX & Investasi CAPEX',
         '/journal': 'Jurnal Akuntansi Double-Entry',
         '/reports': 'Laporan Keuangan & BEP',
         '/audit': 'Audit Trail & Log Aktivitas',
@@ -1057,10 +1058,69 @@ export const ERPProvider = ({ children }) => {
     }
   };
 
+  // FSD v1.1 Section 6: Promo Bundle 1 Liter helper
+  const isOneLiter = (sizeLabel, sizeMl) => {
+    if (!sizeLabel && !sizeMl) return false;
+    const lbl = (sizeLabel || '').toLowerCase();
+    return lbl.includes('1 liter') || lbl.includes('1l') || sizeMl === 1000;
+  };
+
+  const calculateBundle1LPricing = (cartItems) => {
+    // IF SUM(Qty_Botol_1L_All_Variants) >= 2 THEN Price = 55.000 ELSE 60.000
+    const total1LQty = (cartItems || []).reduce((sum, it) => {
+      return isOneLiter(it.sizeLabel, it.sizeMl) ? sum + (Number(it.qty) || 0) : sum;
+    }, 0);
+
+    const isPromoActive = total1LQty >= 2;
+
+    const updatedItems = (cartItems || []).map(it => {
+      const is1L = isOneLiter(it.sizeLabel, it.sizeMl);
+      if (is1L) {
+        return {
+          ...it,
+          unitPrice: isPromoActive ? 55000 : 60000,
+          isBundlePromo: isPromoActive
+        };
+      }
+      return it;
+    });
+
+    return {
+      items: updatedItems,
+      total1LQty,
+      isPromoActive,
+      savings: isPromoActive ? total1LQty * 5000 : 0
+    };
+  };
+
   const addOpex = async (opexData) => {
     try {
       const amount = Number(opexData.amount) || 0;
       const today = new Date().toISOString().split('T')[0];
+      const opexType = opexData.opexType || 'OPEX_RUTIN';
+
+      // FSD v1.1 Auto-Journal Rules:
+      // OPEX Rutin: (D) Beban Operasional 502 / (K) Kas/Bank 101
+      // OPEX Waste CFD: (D) Beban Waste CFD 504 / (K) Persediaan Bahan 102
+      // CAPEX Peralatan: (D) Aset Tetap Peralatan 103 / (K) Kas 101 atau Hutang 201
+      // CAPEX Perlengkapan: (D) Aset Perlengkapan 104 / (K) Kas 101
+      let debitAccount = '502';
+      let creditAccount = opexData.paymentAccountCode || '101';
+      let typeLabel = 'OPEX Rutin';
+
+      if (opexType === 'OPEX_WASTE_CFD') {
+        debitAccount = '504';
+        creditAccount = '102';
+        typeLabel = 'OPEX Waste CFD';
+      } else if (opexType === 'CAPEX_PERALATAN') {
+        debitAccount = '103';
+        creditAccount = opexData.paymentAccountCode || '101';
+        typeLabel = 'CAPEX Peralatan';
+      } else if (opexType === 'CAPEX_PERLENGKAPAN') {
+        debitAccount = '104';
+        creditAccount = '101';
+        typeLabel = 'CAPEX Perlengkapan';
+      }
 
       // 1. Insert into opex_expenses
       const { data: newOpexData, error: errOpex } = await supabase
@@ -1068,41 +1128,52 @@ export const ERPProvider = ({ children }) => {
         .insert({
           expense_date: opexData.date || today,
           category: opexData.category,
-          description: opexData.description,
+          description: opexData.description || opexData.category,
           amount: amount,
-          payment_account_code: opexData.paymentAccountCode || '101'
+          payment_account_code: creditAccount
         })
         .select();
 
       if (errOpex) throw errOpex;
 
+      // Cache receipt image locally if provided
+      if (newOpexData && newOpexData[0] && opexData.receiptData) {
+        try {
+          localStorage.setItem(`ks_receipt_${newOpexData[0].id}`, opexData.receiptData);
+        } catch (e) {
+          console.warn('Local storage receipt caching error:', e);
+        }
+      }
+
       // 2. Insert auto-journal
-      const refNumber = `OPEX-${Math.floor(100 + Math.random() * 900)}`;
+      const prefix = opexType.startsWith('CAPEX') ? 'CAPEX' : (opexType === 'OPEX_WASTE_CFD' ? 'WASTE' : 'OPEX');
+      const refNumber = `${prefix}-${Math.floor(100 + Math.random() * 900)}`;
       const { data: jEntry } = await supabase.from('journal_entries').insert({
         entry_date: opexData.date || today,
         reference_number: refNumber,
-        description: `Pengeluaran OPEX: ${opexData.category} (${opexData.description})`
+        description: `Pengeluaran ${typeLabel}: ${opexData.category} (${opexData.description || ''})`
       }).select();
 
       if (jEntry && jEntry[0]) {
         await supabase.from('journal_items').insert([
-          { journal_entry_id: jEntry[0].id, account_code: '601', debit: amount, credit: 0 },
-          { journal_entry_id: jEntry[0].id, account_code: opexData.paymentAccountCode || '101', debit: 0, credit: amount }
+          { journal_entry_id: jEntry[0].id, account_code: debitAccount, debit: amount, credit: 0 },
+          { journal_entry_id: jEntry[0].id, account_code: creditAccount, debit: 0, credit: amount }
         ]);
       }
 
       logAudit({
-        action: 'OPEX_ADD',
+        action: opexType.startsWith('CAPEX') ? 'CAPEX_ADD' : 'OPEX_ADD',
         category: 'KEUANGAN',
-        description: `Beban Operasional Rp ${amount.toLocaleString('id-ID')} (${opexData.category}: ${opexData.description}) tersimpan di Supabase`,
-        details: opexData
+        description: `${typeLabel} Rp ${amount.toLocaleString('id-ID')} (${opexData.category}) diposting ke Jurnal (Debet ${debitAccount} / Kredit ${creditAccount})`,
+        details: { ...opexData, debitAccount, creditAccount, refNumber }
       });
 
-      showToast(`Biaya OPEX Rp ${amount.toLocaleString('id-ID')} dicatat ke database Supabase!`, 'success');
+      showToast(`Transaksi ${typeLabel} Rp ${amount.toLocaleString('id-ID')} berhasil dicatat & diposting ke Jurnal!`, 'success');
       await fetchAllFromSupabase();
+      return newOpexData?.[0];
     } catch (err) {
-      console.error('Error adding OPEX in Supabase:', err);
-      showToast('Gagal mencatat OPEX: ' + err.message, 'error');
+      console.error('Error adding OPEX/CAPEX in Supabase:', err);
+      showToast('Gagal mencatat transaksi: ' + err.message, 'error');
     }
   };
 
@@ -1111,6 +1182,7 @@ export const ERPProvider = ({ children }) => {
     let journalRevenue = 0;
     let journalBPP = 0;
     let journalOpex = 0;
+    let journalCapex = 0;
     let hasJournalData = false;
 
     if (journal && journal.length > 0) {
@@ -1126,9 +1198,11 @@ export const ERPProvider = ({ children }) => {
           } else if (code === '501') {
             hasJournalData = true;
             journalBPP += (debit - credit);
-          } else if (code === '601') {
+          } else if (code === '502' || code === '504' || code === '601') {
             hasJournalData = true;
             journalOpex += (debit - credit);
+          } else if (code === '103' || code === '104') {
+            journalCapex += (debit - credit);
           }
         });
       });
@@ -1141,7 +1215,7 @@ export const ERPProvider = ({ children }) => {
 
     const totalRevenue = hasJournalData ? journalRevenue : orderRevenue;
     const totalHPP = hasJournalData ? journalBPP : orderHPP;
-    const totalOpex = hasJournalData ? (journalOpex + orderOpex) : orderOpex;
+    const totalOpex = hasJournalData ? Math.max(journalOpex, orderOpex) : orderOpex;
     const grossProfit = totalRevenue - totalHPP;
     const netProfit = grossProfit - totalOpex;
 
@@ -1154,6 +1228,7 @@ export const ERPProvider = ({ children }) => {
       totalHPP,
       grossProfit,
       totalOpex,
+      journalCapex,
       netProfit,
       bepCups,
       bepBatches,
@@ -1206,7 +1281,9 @@ export const ERPProvider = ({ children }) => {
         deleteBOMItem,
         saveVariantRecipe,
         calculateFinancials,
-        resetData
+        resetData,
+        calculateBundle1LPricing,
+        isOneLiter
       }}
     >
       {children}

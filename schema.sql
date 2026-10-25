@@ -299,15 +299,19 @@ EXECUTE FUNCTION fn_process_completed_order();
 -- INITIAL SEED DATA (BASED ON FSD SPECIFICATIONS)
 -- =============================================================================
 
--- Seed COA
+-- Seed COA (FSD v1.1 Standardized Accounts)
 INSERT INTO chart_of_accounts (code, name, type, description) VALUES
 ('101', 'Kas / Bank', 'ASSET', 'Pencatatan kas masuk hasil penjualan dan pengeluaran tunai'),
 ('102', 'Persediaan Bahan', 'ASSET', 'Aset persediaan bahan baku terpusat toko'),
-('201', 'Hutang Supplier', 'LIABILITY', 'Kewajiban pembayaran pembelian kredit vendor'),
+('103', 'Aset Tetap Peralatan', 'ASSET', 'Aset tetap mesin espresso, grinder, blender, coolbox'),
+('104', 'Aset Perlengkapan', 'ASSET', 'Aset perlengkapan toko masa manfaat < 1 tahun (meja lipat, canopy, banner)'),
+('201', 'Hutang Supplier', 'LIABILITY', 'Kewajiban pembayaran pembelian kredit vendor / perlengkapan'),
 ('301', 'Modal Toko', 'EQUITY', 'Modal terpusat pemilik toko'),
 ('401', 'Pendapatan Sales', 'REVENUE', 'Pendapatan hasil penjualan kopi PO & CFD'),
 ('501', 'BPP (HPP Kopi)', 'EXPENSE', 'Harga Pokok Penjualan berbasis deduksi resep BOM'),
-('601', 'Beban Operasional', 'EXPENSE', 'Biaya operasional sewa, listrik, pemasaran, packaging')
+('502', 'Beban Operasional', 'EXPENSE', 'Biaya operasional rutin toko (listrik, kebersihan, air, sewa)'),
+('504', 'Beban Waste CFD', 'EXPENSE', 'Beban kerugian produk olahan CFD tidak laku / rusak'),
+('601', 'Biaya Lain-lain', 'EXPENSE', 'Beban operasional & lain-lain tambahan')
 ON CONFLICT (code) DO NOTHING;
 
 -- Seed Raw Materials (FSD Section 4.1)

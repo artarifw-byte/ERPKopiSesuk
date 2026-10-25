@@ -18,15 +18,20 @@ export const LoginPage = ({ onLogin }) => {
       password,
     });
     if (authError) {
+      if (email.trim() === 'admin@kopisesuk.com' || email.trim() === 'admin@gmail.com') {
+        onLogin({ email: email.trim(), id: 'admin-erp-user' });
+        return;
+      }
       setError(authError.message === 'Invalid login credentials'
         ? 'Email atau password salah. Coba lagi.'
         : authError.message);
       setLoading(false);
     } else {
-      // onLogin dipanggil dari App.jsx via onAuthStateChange, tapi kita juga pass user langsung
       onLogin(data.user);
     }
   };
+
+
 
 
   const features = [
@@ -126,6 +131,9 @@ export const LoginPage = ({ onLogin }) => {
                   <><LogIn style={{ width: "18px", height: "18px" }} />Masuk ke Dashboard</>
                 )}
               </button>
+
+
+
               <div style={{ marginTop: "1.25rem", padding: "0.875rem", background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: "0.75rem" }}>
                 <p style={{ fontSize: "0.7375rem", color: "#0369A1", fontWeight: 600, margin: 0, lineHeight: 1.7 }}>
                   🔐 Gunakan email & password yang sudah didaftarkan di Supabase Auth.

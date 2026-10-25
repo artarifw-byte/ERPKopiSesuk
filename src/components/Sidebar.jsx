@@ -11,6 +11,7 @@ import {
   Database,
   ShieldCheck,
   History,
+  ReceiptText,
   X
 } from 'lucide-react';
 
@@ -59,6 +60,13 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
       label: 'Resep BOM (Takaran)',
       icon: UtensilsCrossed,
       roles: ['super_admin', 'store_admin']
+    },
+    {
+      id: 'opex',
+      label: 'Beban OPEX & CAPEX',
+      icon: ReceiptText,
+      roles: ['super_admin', 'store_admin', 'finance'],
+      badge: 'Baru'
     },
     {
       id: 'journal',
@@ -113,7 +121,7 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
         </div>
         <div className="flex items-baseline gap-2">
           <h1 className="font-black text-base tracking-tight text-slate-900 leading-none whitespace-nowrap">Kopi Sesuk</h1>
-          <span className="text-xs font-extrabold text-sky-600 whitespace-nowrap">ERP v1.0</span>
+          <span className="text-xs font-extrabold text-sky-600 whitespace-nowrap">ERP v1.1</span>
         </div>
       </div>
 
