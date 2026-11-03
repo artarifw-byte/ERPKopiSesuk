@@ -7,6 +7,10 @@ import {
   Printer,
   PlusCircle,
   Banknote,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 
 export const OrdersModule = ({ onOpenNewOrder, onShowReceipt }) => {
@@ -14,17 +18,60 @@ export const OrdersModule = ({ onOpenNewOrder, onShowReceipt }) => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [periodFilter, setPeriodFilter] = useState('ALL');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   // { [orderId]: paymentMethod } untuk konfirmasi lunas
   const [confirmPayMethod, setConfirmPayMethod] = useState({});
   const [confirmingId, setConfirmingId] = useState(null);
 
   const filteredOrders = orders.filter(ord => {
+    // 1. Global Keyword Search
+    const q = searchQuery.toLowerCase().trim();
+    const itemNames = (ord.items || []).map(it => it.productName || '').join(' ').toLowerCase();
     const matchesSearch =
-      ord.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ord.customerName.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      ord.orderNumber.toLowerCase().includes(q) ||
+      ord.customerName.toLowerCase().includes(q) ||
+      (ord.segment || '').toLowerCase().includes(q) ||
+      itemNames.includes(q);
+
+    // 2. Status Filter
     const matchesStatus = selectedStatus === 'ALL' || ord.status === selectedStatus;
-    return matchesSearch && matchesStatus;
+    if (!matchesSearch || !matchesStatus) return false;
+
+    // 3. Date / Period Filter
+    const orderDate = new Date(ord.deliveryDate || ord.createdAt);
+    const now = new Date();
+    if (periodFilter === 'THIS_MONTH') {
+      if (orderDate.getMonth() !== now.getMonth() || orderDate.getFullYear() !== now.getFullYear()) {
+        return false;
+      }
+    } else if (periodFilter === 'LAST_MONTH') {
+      const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+      const lastYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+      if (orderDate.getMonth() !== lastMonth || orderDate.getFullYear() !== lastYear) {
+        return false;
+      }
+    } else if (periodFilter === 'THIS_YEAR') {
+      if (orderDate.getFullYear() !== now.getFullYear()) return false;
+    } else if (periodFilter === 'CUSTOM') {
+      if (startDate && ord.deliveryDate < startDate) return false;
+      if (endDate && ord.deliveryDate > endDate) return false;
+    }
+
+    return true;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / itemsPerPage));
+  const paginatedOrders = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedStatus, periodFilter, startDate, endDate]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -37,7 +84,7 @@ export const OrdersModule = ({ onOpenNewOrder, onShowReceipt }) => {
             Jadwal Pre-Order (PO) & Penjualan
           </h2>
           <p style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '0.25rem' }}>
-            Kelola Jadwal Pre-Order, Status Pesanan, dan Bukti Cetak
+            Navigasi Pencarian Seragam, Filter Periode Cepat & Pembatasan 10 Baris/Halaman
           </p>
         </div>
         <button
@@ -57,53 +104,111 @@ export const OrdersModule = ({ onOpenNewOrder, onShowReceipt }) => {
         </button>
       </div>
 
-      {/* Filters */}
-      <div className="glass-card" style={{ padding: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.875rem' }}>
-        {/* Search */}
-        <div style={{ position: 'relative', width: '320px' }}>
-          <Search style={{ width: '14px', height: '14px', position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
-          <input
-            type="text"
-            placeholder="Cari No. Order / Nama Pelanggan..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.5rem 0.75rem 0.5rem 2.25rem',
-              background: '#F8FAFC',
-              border: '1.5px solid #E2E8F0',
-              borderRadius: '0.625rem',
-              fontSize: '0.8125rem',
-              color: '#0F172A',
-              outline: 'none',
-            }}
-            onFocus={e => { e.target.style.borderColor = '#0284C7'; e.target.style.boxShadow = '0 0 0 3px rgba(2,132,199,0.1)'; }}
-            onBlur={e => { e.target.style.borderColor = '#E2E8F0'; e.target.style.boxShadow = 'none'; }}
-          />
+      {/* Filters (FSD v1.1 Section 3) */}
+      <div className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.875rem' }}>
+          {/* Global Search */}
+          <div style={{ position: 'relative', width: '320px', minWidth: '240px' }}>
+            <Search style={{ width: '14px', height: '14px', position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+            <input
+              type="text"
+              placeholder="Cari No. Order, Customer, Produk, Instansi..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.5rem 0.75rem 0.5rem 2.25rem',
+                background: '#F8FAFC',
+                border: '1.5px solid #E2E8F0',
+                borderRadius: '0.625rem',
+                fontSize: '0.8125rem',
+                color: '#0F172A',
+                outline: 'none',
+              }}
+              onFocus={e => { e.target.style.borderColor = '#0284C7'; e.target.style.boxShadow = '0 0 0 3px rgba(2,132,199,0.1)'; }}
+              onBlur={e => { e.target.style.borderColor = '#E2E8F0'; e.target.style.boxShadow = 'none'; }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexWrap: 'wrap' }}>
+            {/* Status Select */}
+            <select
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              style={{
+                padding: '0.5rem 0.875rem',
+                background: '#F8FAFC',
+                border: '1.5px solid #E2E8F0',
+                borderRadius: '0.625rem',
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+                color: '#0F172A',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="ALL">Semua Status</option>
+              <option value="PENDING">PENDING</option>
+              <option value="COMPLETED">COMPLETED</option>
+            </select>
+
+            {/* Quick Period Filter Dropdown */}
+            <select
+              value={periodFilter}
+              onChange={(e) => setPeriodFilter(e.target.value)}
+              style={{
+                padding: '0.5rem 0.875rem',
+                background: '#F8FAFC',
+                border: '1.5px solid #E2E8F0',
+                borderRadius: '0.625rem',
+                fontSize: '0.8125rem',
+                fontWeight: 600,
+                color: '#0F172A',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="ALL">Semua Periode</option>
+              <option value="THIS_MONTH">Bulan Ini</option>
+              <option value="LAST_MONTH">Bulan Lalu</option>
+              <option value="THIS_YEAR">Tahun Ini</option>
+              <option value="CUSTOM">Rentang Tanggal Kustom...</option>
+            </select>
+          </div>
         </div>
 
-        {/* Status Select */}
-        <select
-          value={selectedStatus}
-          onChange={(e) => setSelectedStatus(e.target.value)}
-          style={{
-            padding: '0.5rem 0.875rem',
-            background: '#F8FAFC',
-            border: '1.5px solid #E2E8F0',
-            borderRadius: '0.625rem',
-            fontSize: '0.8125rem',
-            fontWeight: 600,
-            color: '#0F172A',
-            cursor: 'pointer',
-            outline: 'none',
-          }}
-          onFocus={e => e.target.style.borderColor = '#0284C7'}
-          onBlur={e => e.target.style.borderColor = '#E2E8F0'}
-        >
-          <option value="ALL">Semua Status</option>
-          <option value="PENDING">PENDING</option>
-          <option value="COMPLETED">COMPLETED</option>
-        </select>
+        {/* Custom Date Range Picker */}
+        {periodFilter === 'CUSTOM' && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.75rem',
+            padding: '0.65rem 0.875rem', background: '#F0F9FF',
+            borderRadius: '0.625rem', border: '1px solid #BAE6FD',
+            flexWrap: 'wrap'
+          }}>
+            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#0369A1' }}>Rentang Pengiriman:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={{ padding: '0.35rem 0.6rem', background: '#FFFFFF', border: '1px solid #BAE6FD', borderRadius: '0.5rem', fontSize: '0.75rem' }}
+            />
+            <span style={{ fontSize: '0.75rem', color: '#64748B' }}>s/d</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              style={{ padding: '0.35rem 0.6rem', background: '#FFFFFF', border: '1px solid #BAE6FD', borderRadius: '0.5rem', fontSize: '0.75rem' }}
+            />
+            {(startDate || endDate) && (
+              <button
+                onClick={() => { setStartDate(''); setEndDate(''); }}
+                style={{ fontSize: '0.75rem', color: '#0284C7', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Table */}
@@ -123,14 +228,14 @@ export const OrdersModule = ({ onOpenNewOrder, onShowReceipt }) => {
               </tr>
             </thead>
             <tbody>
-              {filteredOrders.length === 0 ? (
+              {paginatedOrders.length === 0 ? (
                 <tr>
                   <td colSpan="8" style={{ textAlign: 'center', padding: '3rem', color: '#94A3B8', fontSize: '0.875rem' }}>
                     Tidak ada transaksi order yang cocok dengan filter.
                   </td>
                 </tr>
               ) : (
-                filteredOrders.map((ord) => (
+                paginatedOrders.map((ord) => (
                   <tr key={ord.id}>
                     <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: '#0284C7', fontSize: '0.8rem' }}>
                       {ord.orderNumber}
@@ -299,6 +404,92 @@ export const OrdersModule = ({ onOpenNewOrder, onShowReceipt }) => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Standard Table Pagination (FSD v1.1 Section 3: 10 items/page) */}
+        <div style={{
+          padding: '0.875rem 1.25rem',
+          borderTop: '1.5px solid #E2E8F0',
+          background: '#F8FAFC',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
+        }}>
+          <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
+            Menampilkan <strong style={{ color: '#0F172A' }}>{filteredOrders.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}</strong> - <strong style={{ color: '#0F172A' }}>{Math.min(currentPage * itemsPerPage, filteredOrders.length)}</strong> dari <strong style={{ color: '#0F172A' }}>{filteredOrders.length}</strong> pesanan (Standar 10 baris/halaman)
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.2rem',
+                padding: '0.4rem 0.65rem', borderRadius: '0.5rem',
+                fontSize: '0.75rem', fontWeight: 700,
+                background: '#FFFFFF', color: currentPage === 1 ? '#CBD5E1' : '#475569',
+                border: '1.5px solid #E2E8F0', cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              <ChevronsLeft style={{ width: '14px', height: '14px' }} />
+              First
+            </button>
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.2rem',
+                padding: '0.4rem 0.65rem', borderRadius: '0.5rem',
+                fontSize: '0.75rem', fontWeight: 700,
+                background: '#FFFFFF', color: currentPage === 1 ? '#CBD5E1' : '#475569',
+                border: '1.5px solid #E2E8F0', cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              <ChevronLeft style={{ width: '14px', height: '14px' }} />
+              Prev
+            </button>
+
+            <span style={{
+              padding: '0.4rem 0.875rem', borderRadius: '0.5rem',
+              fontSize: '0.75rem', fontWeight: 800,
+              background: '#0284C7', color: '#FFFFFF', fontFamily: 'var(--font-mono)'
+            }}>
+              Halaman {currentPage} of {totalPages}
+            </span>
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.2rem',
+                padding: '0.4rem 0.65rem', borderRadius: '0.5rem',
+                fontSize: '0.75rem', fontWeight: 700,
+                background: '#FFFFFF', color: currentPage === totalPages ? '#CBD5E1' : '#475569',
+                border: '1.5px solid #E2E8F0', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Next
+              <ChevronRight style={{ width: '14px', height: '14px' }} />
+            </button>
+
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.2rem',
+                padding: '0.4rem 0.65rem', borderRadius: '0.5rem',
+                fontSize: '0.75rem', fontWeight: 700,
+                background: '#FFFFFF', color: currentPage === totalPages ? '#CBD5E1' : '#475569',
+                border: '1.5px solid #E2E8F0', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Last
+              <ChevronsRight style={{ width: '14px', height: '14px' }} />
+            </button>
+          </div>
         </div>
       </div>
     </div>

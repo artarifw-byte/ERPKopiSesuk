@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useERP } from '../context/ERPContext';
 import {
   DollarSign,
@@ -10,12 +10,22 @@ import {
   ShieldAlert,
   CheckCircle2,
   PieChart,
+  Printer,
+  Clock,
+  Sparkles,
+  CheckSquare,
+  FileText,
+  X,
+  ChevronRight,
+  Layers,
+  AlertOctagon
 } from 'lucide-react';
 
 export const Dashboard = ({ onOpenNewOrder, onOpenStockIn, onOpenOpex, onOpenDDL }) => {
   const {
     orders,
     materials,
+    bom,
     calculateFinancials,
     calculateSSAndROP,
     completeOrder,
@@ -23,6 +33,7 @@ export const Dashboard = ({ onOpenNewOrder, onOpenStockIn, onOpenOpex, onOpenDDL
   } = useERP();
 
   const fin = calculateFinancials();
+  const [isWorkOrderOpen, setIsWorkOrderOpen] = useState(false);
 
   // Find critical / reorder materials
   const warningMaterials = materials
@@ -34,6 +45,76 @@ export const Dashboard = ({ onOpenNewOrder, onOpenStockIn, onOpenOpex, onOpenDDL
 
   const pendingOrders = orders.filter(o => o.status === 'PENDING');
   const completedOrders = orders.filter(o => o.status === 'COMPLETED');
+
+  // FSD v1.1 Section 5: Pre-Order (PO) H-1 Scanner (Otomatis scan pengiriman esok hari)
+  const poH1Data = useMemo(() => {
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const todayStr = now.toISOString().split('T')[0];
+
+    // Scan PO orders scheduled for tomorrow or today that are still PENDING
+    const matchedOrders = orders.filter(o =>
+      o.status === 'PENDING' && (o.deliveryDate === tomorrow || o.deliveryDate === todayStr || o.segment === 'BNPP' || o.segment === 'BAF')
+    );
+
+    const materialNeeds = {};
+    const menuChecklist = {};
+
+    matchedOrders.forEach(ord => {
+      (ord.items || []).forEach(item => {
+        const vId = item.variantId;
+        const qty = Number(item.quantity || item.qty) || 0;
+        const vName = item.productName ? `${item.productName} (${item.sizeLabel || ''})` : `Varian ${vId}`;
+
+        menuChecklist[vName] = (menuChecklist[vName] || 0) + qty;
+
+        // Trace recipe
+        const recipes = (bom || []).filter(b => b.variantId === vId || b.variant_id === vId);
+        recipes.forEach(r => {
+          const matId = r.rawMaterialId || r.raw_material_id || r.materialId;
+          const reqPerPortion = Number(r.qtyRequired || r.qty_required || r.qty) || 0;
+          materialNeeds[matId] = (materialNeeds[matId] || 0) + (reqPerPortion * qty);
+        });
+      });
+    });
+
+    const deficitMaterials = [];
+    const sufficientMaterials = [];
+    let isInsufficient = false;
+
+    Object.entries(materialNeeds).forEach(([matId, neededQty]) => {
+      const mat = materials.find(m => m.id === matId);
+      if (!mat) return;
+      const curStock = Number(mat.currentStock ?? mat.current_stock ?? 0);
+      const deficit = Math.max(0, neededQty - curStock);
+      const row = {
+        material: mat,
+        name: mat.name,
+        neededQty: Math.round(neededQty * 100) / 100,
+        currentStock: curStock,
+        deficit: Math.round(deficit * 100) / 100,
+        unit: mat.unit || mat.base_unit || 'gram',
+        isDeficit: deficit > 0
+      };
+
+      if (deficit > 0) {
+        isInsufficient = true;
+        deficitMaterials.push(row);
+      } else {
+        sufficientMaterials.push(row);
+      }
+    });
+
+    return {
+      tomorrow,
+      matchedOrders,
+      menuChecklist,
+      deficitMaterials,
+      sufficientMaterials,
+      isInsufficient,
+      status: matchedOrders.length === 0 ? 'NO_PO_H1' : (isInsufficient ? 'INSUFFICIENT_STOCK' : 'READY_TO_PREPARE')
+    };
+  }, [orders, materials, bom]);
 
   return (
     <div className="space-y-6">
@@ -62,20 +143,219 @@ export const Dashboard = ({ onOpenNewOrder, onOpenStockIn, onOpenOpex, onOpenDDL
               letterSpacing: '0.02em',
               color: '#ffffff'
             }}>
-              Web & Mobile ERP System
+              ERP v2.0 (Major Release)
             </span>
             <span style={{ fontSize: '0.75rem', color: '#BAE6FD', fontWeight: 600 }}>
-              Oktober 2026
+              November 2026 • General Ledger & Centralized Accounting
             </span>
           </div>
           <h2 style={{ fontSize: '1.625rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.02em', margin: '0 0 0.375rem 0' }}>
-            Sistem ERP Terpusat — Kopi Sesuk
+            Sistem ERP Terpusat — Kopi Sesuk v2.0
           </h2>
           <p style={{ fontSize: '0.875rem', color: '#E0F2FE', maxWidth: '42rem', lineHeight: 1.6, fontWeight: 500, margin: 0 }}>
-            Manajemen Stok Terpusat, Kalkulasi BOM Porsi & Botol 1L, Pemrosesan Jadwal PO/CFD, serta Otomatisasi Akuntansi Double-Entry.
+            Modul Utama Akuntansi & Buku Besar Mandiri, Manajemen Stok Terpusat, Kalkulasi BOM Porsi & Botol 1L, Pemrosesan Jadwal PO/CFD, serta Otomatisasi Double-Entry Bookkeeping.
           </p>
         </div>
       </div>
+
+      {/* FSD v1.1 Section 5: Alert Pre-Order (PO) H-1 Scanner Banner */}
+      {poH1Data.status === 'READY_TO_PREPARE' && (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #ECFDF5 0%, #F0FDF4 100%)',
+            border: '2px solid #86EFAC',
+            borderRadius: '1.125rem',
+            padding: '1.25rem 1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem',
+            boxShadow: '0 4px 16px rgba(22, 163, 74, 0.1)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+              <div style={{
+                width: '44px', height: '44px', borderRadius: '0.75rem',
+                background: '#DCFCE7', border: '1.5px solid #86EFAC',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#15803D', flexShrink: 0
+              }}>
+                <CheckSquare style={{ width: '24px', height: '24px' }} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{
+                    padding: '0.15rem 0.55rem', borderRadius: '0.375rem',
+                    fontSize: '0.7rem', fontWeight: 900,
+                    background: '#15803D', color: '#FFFFFF', letterSpacing: '0.04em'
+                  }}>
+                    READY TO PREPARE
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 700 }}>
+                    Jadwal PO H-1 ({poH1Data.tomorrow})
+                  </span>
+                </div>
+                <h4 style={{ fontSize: '0.9375rem', fontWeight: 900, color: '#14532D', margin: '0.2rem 0 0 0' }}>
+                  Stok Gudang Terpenuhi untuk Seluruh Pesanan Pre-Order Besok
+                </h4>
+                <p style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 600, margin: '0.15rem 0 0 0' }}>
+                  Terdapat <strong style={{ fontWeight: 800 }}>{poH1Data.matchedOrders.length} pesanan PO</strong> siap diracik. Seluruh bahan baku tercukupi di gudang.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setIsWorkOrderOpen(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
+                padding: '0.55rem 1.25rem', borderRadius: '0.75rem',
+                fontSize: '0.8125rem', fontWeight: 800,
+                background: 'linear-gradient(135deg, #16A34A, #15803D)',
+                color: '#FFFFFF', border: 'none', cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Printer style={{ width: '16px', height: '16px' }} />
+              Cetak Work Order Schedule
+            </button>
+          </div>
+
+          {/* Menu Checklist Preview */}
+          <div style={{
+            padding: '0.75rem 1rem', background: '#FFFFFF',
+            borderRadius: '0.75rem', border: '1px solid #BBF7D0',
+            display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem'
+          }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Menu Siap Diracik:
+            </span>
+            {Object.entries(poH1Data.menuChecklist).map(([menu, qty]) => (
+              <span
+                key={menu}
+                style={{
+                  padding: '0.2rem 0.6rem', borderRadius: '0.375rem',
+                  fontSize: '0.75rem', fontWeight: 700,
+                  background: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0'
+                }}
+              >
+                {menu}: <strong style={{ fontFamily: 'var(--font-mono)' }}>{qty} porsi/btl</strong>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* PO H-1 Insufficient Stock Warning (Merah) */}
+      {poH1Data.status === 'INSUFFICIENT_STOCK' && (
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #FEF2F2 0%, #FFF5F5 100%)',
+            border: '2px solid #FCA5A5',
+            borderRadius: '1.125rem',
+            padding: '1.25rem 1.5rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1rem',
+            boxShadow: '0 4px 16px rgba(220, 38, 38, 0.12)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
+              <div style={{
+                width: '44px', height: '44px', borderRadius: '0.75rem',
+                background: '#FEE2E2', border: '1.5px solid #FCA5A5',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#DC2626', flexShrink: 0
+              }}>
+                <AlertOctagon style={{ width: '24px', height: '24px' }} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{
+                    padding: '0.15rem 0.55rem', borderRadius: '0.375rem',
+                    fontSize: '0.7rem', fontWeight: 900,
+                    background: '#DC2626', color: '#FFFFFF', letterSpacing: '0.04em'
+                  }}>
+                    INSUFFICIENT STOCK
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: '#B91C1C', fontWeight: 700 }}>
+                    Peringatan Dini PO H-1 ({poH1Data.tomorrow})
+                  </span>
+                </div>
+                <h4 style={{ fontSize: '0.9375rem', fontWeight: 900, color: '#991B1B', margin: '0.2rem 0 0 0' }}>
+                  Stok Gudang Kurang untuk Memenuhi Pesanan Pre-Order Esok Hari!
+                </h4>
+                <p style={{ fontSize: '0.75rem', color: '#B91C1C', fontWeight: 600, margin: '0.15rem 0 0 0' }}>
+                  Terdapat <strong style={{ fontWeight: 800 }}>{poH1Data.deficitMaterials.length} bahan baku</strong> berada di bawah kebutuhan racik pesanan PO H-1.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+              <button
+                onClick={() => setIsWorkOrderOpen(true)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
+                  padding: '0.5rem 0.9rem', borderRadius: '0.625rem',
+                  fontSize: '0.8rem', fontWeight: 700,
+                  background: '#FFFFFF', color: '#DC2626',
+                  border: '1.5px solid #FCA5A5', cursor: 'pointer'
+                }}
+              >
+                <FileText style={{ width: '14px', height: '14px' }} />
+                Lihat Jadwal PO
+              </button>
+              <button
+                onClick={onOpenStockIn}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
+                  padding: '0.55rem 1.25rem', borderRadius: '0.75rem',
+                  fontSize: '0.8125rem', fontWeight: 800,
+                  background: 'linear-gradient(135deg, #DC2626, #B91C1C)',
+                  color: '#FFFFFF', border: 'none', cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(220, 38, 38, 0.35)'
+                }}
+              >
+                <Package style={{ width: '16px', height: '16px' }} />
+                Buat PO Supplier / Terima Stok
+              </button>
+            </div>
+          </div>
+
+          {/* Deficit Materials Table */}
+          <div style={{ background: '#FFFFFF', borderRadius: '0.75rem', border: '1px solid #FECACA', overflow: 'hidden' }}>
+            <table className="custom-table" style={{ margin: 0 }}>
+              <thead>
+                <tr>
+                  <th>Bahan Baku Defisit</th>
+                  <th style={{ textAlign: 'right' }}>Dibutuhkan PO H-1</th>
+                  <th style={{ textAlign: 'right' }}>Stok Gudang Saat Ini</th>
+                  <th style={{ textAlign: 'right' }}>Kekurangan (Defisit)</th>
+                  <th style={{ textAlign: 'center' }}>Tindakan Rekomendasi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {poH1Data.deficitMaterials.map(d => (
+                  <tr key={d.name}>
+                    <td style={{ fontWeight: 700, color: '#991B1B' }}>{d.name}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{d.neededQty.toLocaleString('id-ID')} {d.unit}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{d.currentStock.toLocaleString('id-ID')} {d.unit}</td>
+                    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 800, color: '#DC2626' }}>
+                      - {d.deficit.toLocaleString('id-ID')} {d.unit}
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#DC2626', background: '#FEE2E2', padding: '0.2rem 0.5rem', borderRadius: '0.375rem' }}>
+                        Restok Segera
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Critical Stock Alert Banner (Merah / Red) */}
       {criticalMaterials.length > 0 && (
@@ -447,6 +727,203 @@ export const Dashboard = ({ onOpenNewOrder, onOpenStockIn, onOpenOpex, onOpenDDL
           </div>
         </div>
       </div>
+
+      {/* MODAL: CETAK WORK ORDER SCHEDULE (FSD v1.1 Section 5) */}
+      {isWorkOrderOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '640px' }}>
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1.5px solid #E2E8F0',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: '#F8FAFC',
+              borderRadius: '1.5rem 1.5rem 0 0'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{
+                  width: '38px', height: '38px', borderRadius: '0.625rem',
+                  background: 'linear-gradient(135deg, #16A34A, #15803D)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#FFFFFF', boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)'
+                }}>
+                  <Printer style={{ width: '20px', height: '20px' }} />
+                </div>
+                <div>
+                  <h3 style={{ fontWeight: 900, color: '#0F172A', fontSize: '1rem', lineHeight: 1.2 }}>
+                    Work Order Schedule Produksi PO H-1
+                  </h3>
+                  <p style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '0.15rem' }}>
+                    Dokumen Kerja Racik Menu & Alokasi Bahan Baku PO ({poH1Data.tomorrow})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsWorkOrderOpen(false)}
+                style={{
+                  width: '32px', height: '32px', borderRadius: '0.5rem',
+                  background: '#F1F5F9', border: '1px solid #E2E8F0',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: '#64748B'
+                }}
+              >
+                <X style={{ width: '16px', height: '16px' }} />
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.125rem' }}>
+              {/* Target & Customer Details */}
+              <div style={{
+                padding: '0.875rem 1rem', background: '#F0FDF4',
+                border: '1.5px solid #BBF7D0', borderRadius: '0.75rem',
+                display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem'
+              }}>
+                <div>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase' }}>
+                    Target Pengiriman PO
+                  </span>
+                  <div style={{ fontSize: '1rem', fontWeight: 900, color: '#14532D', fontFamily: 'var(--font-mono)' }}>
+                    {poH1Data.tomorrow}
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase' }}>
+                    Status Kesiapan Gudang
+                  </span>
+                  <div style={{ fontSize: '0.875rem', fontWeight: 900, color: poH1Data.isInsufficient ? '#DC2626' : '#15803D' }}>
+                    {poH1Data.isInsufficient ? 'INSUFFICIENT STOCK' : 'READY TO PREPARE ✓'}
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase' }}>
+                    Total Order PO
+                  </span>
+                  <div style={{ fontSize: '1rem', fontWeight: 900, color: '#14532D', fontFamily: 'var(--font-mono)' }}>
+                    {poH1Data.matchedOrders.length} Pesanan
+                  </div>
+                </div>
+              </div>
+
+              {/* Order List Breakdown */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.5rem' }}>
+                  DAFTAR ORDER & INSTANSI PEMESAN:
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '140px', overflowY: 'auto' }}>
+                  {poH1Data.matchedOrders.map(ord => (
+                    <div key={ord.id} style={{
+                      padding: '0.6rem 0.875rem', background: '#F8FAFC',
+                      borderRadius: '0.625rem', border: '1px solid #E2E8F0',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                    }}>
+                      <div>
+                        <strong style={{ fontSize: '0.8125rem', color: '#0F172A' }}>{ord.customerName}</strong>
+                        <span style={{ fontSize: '0.7rem', color: '#64748B', marginLeft: '0.5rem' }}>({ord.segment})</span>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 700, color: '#0284C7' }}>
+                        {ord.orderNumber}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Menu Racik Checklist */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.5rem' }}>
+                  CHECKLIST MENU YANG HARUS DIRACIK & DIPACKING:
+                </label>
+                <div style={{ border: '1.5px solid #E2E8F0', borderRadius: '0.75rem', overflow: 'hidden' }}>
+                  <table className="custom-table" style={{ margin: 0 }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: '40px', textAlign: 'center' }}>✓</th>
+                        <th>Varian Produk</th>
+                        <th style={{ textAlign: 'center', width: '120px' }}>Jumlah Porsi/Btl</th>
+                        <th style={{ textAlign: 'center', width: '100px' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(poH1Data.menuChecklist).map(([menu, qty], i) => (
+                        <tr key={menu}>
+                          <td style={{ textAlign: 'center' }}>
+                            <input type="checkbox" style={{ cursor: 'pointer', transform: 'scale(1.15)' }} />
+                          </td>
+                          <td style={{ fontWeight: 700, color: '#0F172A' }}>{menu}</td>
+                          <td style={{ textAlign: 'center', fontFamily: 'var(--font-mono)', fontWeight: 800, color: '#0284C7' }}>
+                            {qty} unit
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#166534', background: '#DCFCE7', padding: '0.15rem 0.5rem', borderRadius: '0.375rem' }}>
+                              Siap Racik
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Kebutuhan Bahan Baku */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 800, color: '#475569', marginBottom: '0.5rem' }}>
+                  ALOKASI BAHAN BAKU BOM:
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  {[...poH1Data.sufficientMaterials, ...poH1Data.deficitMaterials].map(m => (
+                    <span
+                      key={m.name}
+                      style={{
+                        padding: '0.3rem 0.6rem', borderRadius: '0.5rem',
+                        fontSize: '0.72rem', fontWeight: 700,
+                        background: m.isDeficit ? '#FEF2F2' : '#F0FDF4',
+                        color: m.isDeficit ? '#DC2626' : '#166534',
+                        border: `1px solid ${m.isDeficit ? '#FCA5A5' : '#BBF7D0'}`
+                      }}
+                    >
+                      {m.name}: <strong style={{ fontFamily: 'var(--font-mono)' }}>{m.neededQty} {m.unit}</strong> {m.isDeficit ? `(Kurang ${m.deficit})` : '✓'}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingTop: '0.5rem', borderTop: '1.5px solid #E2E8F0' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsWorkOrderOpen(false)}
+                  style={{
+                    padding: '0.55rem 1.25rem', borderRadius: '0.75rem',
+                    fontSize: '0.8125rem', fontWeight: 700,
+                    background: '#F1F5F9', color: '#475569',
+                    border: '1.5px solid #E2E8F0', cursor: 'pointer'
+                  }}
+                >
+                  Tutup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
+                    padding: '0.55rem 1.5rem', borderRadius: '0.75rem',
+                    fontSize: '0.8125rem', fontWeight: 800,
+                    background: 'linear-gradient(135deg, #16A34A, #15803D)',
+                    color: '#FFFFFF', border: 'none', cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(22, 163, 74, 0.3)'
+                  }}
+                >
+                  <Printer style={{ width: '16px', height: '16px' }} />
+                  Cetak Jadwal Produksi (Print)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

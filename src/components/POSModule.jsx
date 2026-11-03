@@ -13,7 +13,7 @@ import {
 
 export const POSModule = ({ onShowReceipt }) => {
   const navigate = useNavigate();
-  const { products, getVariantsWithHPP, createOrder } = useERP();
+  const { products, getVariantsWithHPP, createOrder, calculateBundle1LPricing, isOneLiter } = useERP();
 
   const [cart, setCart] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(products[0]?.id || '');
@@ -25,6 +25,7 @@ export const POSModule = ({ onShowReceipt }) => {
   const currentProduct = products.find(p => p.id === selectedProduct) || products[0];
 
   const isOneLiterVariant = (sizeLabel, sizeMl) => {
+    if (isOneLiter) return isOneLiter(sizeLabel, sizeMl);
     if (!sizeLabel && !sizeMl) return false;
     const labelLower = (sizeLabel || '').toLowerCase();
     return labelLower.includes('1 liter') || labelLower.includes('1l') || sizeMl === 1000;
@@ -36,20 +37,15 @@ export const POSModule = ({ onShowReceipt }) => {
       const existingIndex = prev.findIndex(
         item => item.variantId === variant.id && item.sugarLevel === selectedSugar
       );
+      let updatedCart;
       if (existingIndex > -1) {
-        return prev.map((item, idx) => {
+        updatedCart = prev.map((item, idx) => {
           if (idx !== existingIndex) return item;
-          const nextQty = item.qty + 1;
-          const nextPrice = is1L ? (nextQty >= 2 ? 55000 : 60000) : (item.defaultPrice || variant.sellingPrice || variant.price || 0);
-          return {
-            ...item,
-            qty: nextQty,
-            unitPrice: nextPrice
-          };
+          return { ...item, qty: item.qty + 1 };
         });
       } else {
         const initialPrice = is1L ? 60000 : (variant.sellingPrice || variant.price || 0);
-        return [
+        updatedCart = [
           ...prev,
           {
             variantId: variant.id,
@@ -63,6 +59,9 @@ export const POSModule = ({ onShowReceipt }) => {
           }
         ];
       }
+      // Apply FSD v1.1 bundle calculation across ALL 1L variants in cart
+      const { items } = calculateBundle1LPricing ? calculateBundle1LPricing(updatedCart) : { items: updatedCart };
+      return items;
     });
   };
 
@@ -71,22 +70,19 @@ export const POSModule = ({ onShowReceipt }) => {
       const targetItem = prev[index];
       if (!targetItem) return prev;
       const nextQty = targetItem.qty + delta;
+      let updatedCart;
       if (nextQty <= 0) {
-        return prev.filter((_, i) => i !== index);
+        updatedCart = prev.filter((_, i) => i !== index);
+      } else {
+        updatedCart = prev.map((item, i) => (i === index ? { ...item, qty: nextQty } : item));
       }
-      return prev.map((item, i) => {
-        if (i !== index) return item;
-        const is1L = isOneLiterVariant(item.sizeLabel, item.sizeMl);
-        const nextPrice = is1L ? (nextQty >= 2 ? 55000 : 60000) : item.defaultPrice;
-        return {
-          ...item,
-          qty: nextQty,
-          unitPrice: nextPrice
-        };
-      });
+      // Recalculate bundle promo across whole cart
+      const { items } = calculateBundle1LPricing ? calculateBundle1LPricing(updatedCart) : { items: updatedCart };
+      return items;
     });
   };
 
+  const bundleInfo = calculateBundle1LPricing ? calculateBundle1LPricing(cart) : { isPromoActive: false, total1LQty: 0, savings: 0 };
   const cartTotal = cart.reduce((sum, item) => sum + item.unitPrice * item.qty, 0);
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -270,8 +266,32 @@ export const POSModule = ({ onShowReceipt }) => {
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
             className="form-input"
-            style={{ fontSize: '0.8125rem', marginBottom: '1rem' }}
+            style={{ fontSize: '0.8125rem', marginBottom: '0.75rem' }}
           />
+
+          {/* FSD v1.1 Section 6: Promo Bundle 1L Banner */}
+          {bundleInfo.isPromoActive && (
+            <div style={{
+              padding: '0.625rem 0.875rem',
+              background: '#ECFDF5',
+              border: '1.5px solid #A7F3D0',
+              borderRadius: '0.75rem',
+              marginBottom: '0.75rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '0.75rem',
+              color: '#065F46'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '1rem' }}>🎉</span>
+                <span><strong>Bundle Promo 1L Aktif!</strong> ({bundleInfo.total1LQty} Botol 1L)</span>
+              </div>
+              <span style={{ fontWeight: 800, fontFamily: 'var(--font-mono)', background: '#FFFFFF', padding: '0.15rem 0.5rem', borderRadius: '0.375rem', border: '1px solid #A7F3D0' }}>
+                Hemat Rp {bundleInfo.savings.toLocaleString('id-ID')}
+              </span>
+            </div>
+          )}
 
           {/* Cart Items */}
           <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
@@ -313,7 +333,7 @@ export const POSModule = ({ onShowReceipt }) => {
                     </div>
                     {isOneLiterVariant(item.sizeLabel, item.sizeMl) && (
                       <div style={{ marginTop: '0.3rem' }}>
-                        {item.qty >= 2 ? (
+                        {bundleInfo.isPromoActive ? (
                           <span style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -325,7 +345,7 @@ export const POSModule = ({ onShowReceipt }) => {
                             padding: '0.15rem 0.5rem',
                             borderRadius: '0.375rem'
                           }}>
-                            Harga Multi: Rp 55.000/pcs
+                            🎉 Promo Bundle 1L: Rp 55.000/botol
                           </span>
                         ) : (
                           <span style={{
@@ -339,7 +359,7 @@ export const POSModule = ({ onShowReceipt }) => {
                             padding: '0.15rem 0.5rem',
                             borderRadius: '0.375rem'
                           }}>
-                            Beli ≥2 pcs dapat Rp 55.000/pcs
+                            Beli ≥2 botol 1L (semua varian) dapat Rp 55.000/btl
                           </span>
                         )}
                       </div>

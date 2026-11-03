@@ -34,7 +34,7 @@ const sectionTitle = {
 };
 
 export const NewOrderModal = ({ isOpen, onClose }) => {
-  const { products, getVariantsWithHPP, createOrder } = useERP();
+  const { products, getVariantsWithHPP, createOrder, calculateBundle1LPricing } = useERP();
 
   const [customerName, setCustomerName] = useState('');
   const [segment, setSegment] = useState('OTHER');
@@ -57,36 +57,40 @@ export const NewOrderModal = ({ isOpen, onClose }) => {
     const v = variants.find(item => item.id === variantId);
     if (!v) return;
     const is1L = isOneLiterVariant(v.sizeLabel);
-    const initialQty = 1;
     const initialPrice = is1L ? 60000 : (v.sellingPrice || 0);
 
-    setItems(prev => [
-      ...prev,
+    const updated = [
+      ...items,
       {
         variantId: v.id,
         productName: v.productName,
         sizeLabel: v.sizeLabel,
         sugarLevel: 'Normal',
-        qty: initialQty,
+        qty: 1,
         unitPrice: initialPrice
       }
-    ]);
+    ];
+    const { items: bundled } = calculateBundle1LPricing ? calculateBundle1LPricing(updated) : { items: updated };
+    setItems(bundled);
   };
 
   const handleUpdateItem = (index, field, value) => {
-    setItems(prev => prev.map((item, i) => {
+    const updated = items.map((item, i) => {
       if (i !== index) return item;
-      const updatedItem = { ...item, [field]: value };
-      if (field === 'qty' && isOneLiterVariant(item.sizeLabel)) {
-        const numQty = Number(value) || 0;
-        updatedItem.unitPrice = numQty >= 2 ? 55000 : 60000;
-      }
-      return updatedItem;
-    }));
+      return { ...item, [field]: value };
+    });
+    if (field === 'qty') {
+      const { items: bundled } = calculateBundle1LPricing ? calculateBundle1LPricing(updated) : { items: updated };
+      setItems(bundled);
+    } else {
+      setItems(updated);
+    }
   };
 
   const handleRemoveItem = (index) => {
-    setItems(prev => prev.filter((_, i) => i !== index));
+    const filtered = items.filter((_, i) => i !== index);
+    const { items: bundled } = calculateBundle1LPricing ? calculateBundle1LPricing(filtered) : { items: filtered };
+    setItems(bundled);
   };
 
   const handleSubmit = (e) => {

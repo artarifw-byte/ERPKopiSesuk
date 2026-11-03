@@ -1,8 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AlertTriangle, RefreshCw, X } from 'lucide-react';
 
 export const ResetConfirmModal = ({ isOpen, onClose, onConfirm }) => {
+  const [loading, setLoading] = useState(false);
+
   if (!isOpen) return null;
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    try {
+      await onConfirm();
+    } finally {
+      setLoading(false);
+      onClose();
+    }
+  };
 
   return (
     <div className="modal-overlay" style={{ zIndex: 1100 }}>
@@ -35,12 +47,13 @@ export const ResetConfirmModal = ({ isOpen, onClose, onConfirm }) => {
                 Reset Database Sistem
               </h3>
               <p style={{ fontSize: '0.75rem', color: '#B91C1C', margin: '0.15rem 0 0 0', fontWeight: 600 }}>
-                Tindakan ini memerlukan konfirmasi
+                Tindakan ini tidak dapat dibatalkan
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
+            disabled={loading}
             style={{
               width: '32px',
               height: '32px',
@@ -48,7 +61,7 @@ export const ResetConfirmModal = ({ isOpen, onClose, onConfirm }) => {
               background: '#FFFFFF',
               border: '1px solid #FECACA',
               color: '#991B1B',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center'
@@ -61,20 +74,41 @@ export const ResetConfirmModal = ({ isOpen, onClose, onConfirm }) => {
         {/* Body */}
         <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <p style={{ fontSize: '0.875rem', color: '#334155', lineHeight: 1.6, margin: 0 }}>
-            Apakah Anda yakin ingin mengembalikan seluruh data ERP ke kondisi awal?
+            <strong>Semua data</strong> akan dihapus permanen dari database Supabase. Database akan menjadi pure kosong.
           </p>
 
           <div style={{
             padding: '0.875rem 1rem',
-            background: '#F8FAFC',
-            border: '1.5px solid #E2E8F0',
+            background: '#FEF2F2',
+            border: '1.5px solid #FECACA',
             borderRadius: '0.75rem',
             fontSize: '0.8125rem',
-            color: '#64748B',
+            color: '#7F1D1D',
+            lineHeight: 1.6
+          }}>
+            <strong style={{ color: '#991B1B', display: 'block', marginBottom: '0.4rem' }}>🗑️ Semua tabel akan di-DELETE:</strong>
+            <ul style={{ margin: '0 0 0 1rem', padding: 0 }}>
+              <li>orders & order_items</li>
+              <li>journal_entries & journal_items</li>
+              <li>opex_expenses & inventory_transactions</li>
+              <li>bom_recipes</li>
+              <li>product_variants & products</li>
+              <li>raw_materials (bahan baku)</li>
+              <li>audit_logs</li>
+            </ul>
+          </div>
+
+          <div style={{
+            padding: '0.75rem 1rem',
+            background: '#FFFBEB',
+            border: '1.5px solid #FCD34D',
+            borderRadius: '0.75rem',
+            fontSize: '0.8125rem',
+            color: '#78350F',
             lineHeight: 1.5
           }}>
-            <strong style={{ color: '#0F172A', display: 'block', marginBottom: '0.25rem' }}>Data yang akan di-reset:</strong>
-            Persediaan stok bahan baku, riwayat order PO & POS, jurnal akuntansi, dan pengeluaran beban operasional (OPEX).
+            <strong style={{ color: '#92400E', display: 'block', marginBottom: '0.25rem' }}>⚠️ Tidak terpengaruh:</strong>
+            Chart of Accounts (COA) — data akuntansi tetap tersimpan.
           </div>
         </div>
 
@@ -90,6 +124,7 @@ export const ResetConfirmModal = ({ isOpen, onClose, onConfirm }) => {
         }}>
           <button
             onClick={onClose}
+            disabled={loading}
             style={{
               padding: '0.55rem 1rem',
               borderRadius: '0.625rem',
@@ -98,16 +133,15 @@ export const ResetConfirmModal = ({ isOpen, onClose, onConfirm }) => {
               background: '#FFFFFF',
               border: '1.5px solid #CBD5E1',
               color: '#475569',
-              cursor: 'pointer'
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.6 : 1
             }}
           >
             Batal
           </button>
           <button
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
+            onClick={handleConfirm}
+            disabled={loading}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -116,18 +150,20 @@ export const ResetConfirmModal = ({ isOpen, onClose, onConfirm }) => {
               borderRadius: '0.625rem',
               fontSize: '0.8125rem',
               fontWeight: 800,
-              background: 'linear-gradient(135deg, #DC2626, #B91C1C)',
+              background: loading ? '#9CA3AF' : 'linear-gradient(135deg, #DC2626, #B91C1C)',
               border: 'none',
               color: '#FFFFFF',
-              cursor: 'pointer',
-              boxShadow: '0 4px 14px rgba(220, 38, 38, 0.35)'
+              cursor: loading ? 'not-allowed' : 'pointer',
+              boxShadow: loading ? 'none' : '0 4px 14px rgba(220, 38, 38, 0.35)',
+              transition: 'all 0.15s'
             }}
           >
-            <RefreshCw style={{ width: '14px', height: '14px' }} />
-            Ya, Reset Seluruh Data
+            <RefreshCw style={{ width: '14px', height: '14px', animation: loading ? 'spin 0.8s linear infinite' : 'none' }} />
+            {loading ? 'Menghapus...' : 'Ya, Hapus Semua Data'}
           </button>
         </div>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };

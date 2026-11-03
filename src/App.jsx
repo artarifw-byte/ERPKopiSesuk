@@ -8,6 +8,7 @@ import { POSModule } from './components/POSModule';
 import { OrdersModule } from './components/OrdersModule';
 import { InventoryModule } from './components/InventoryModule';
 import { BOMModule } from './components/BOMModule';
+import { OpexModule } from './components/OpexModule';
 import { JournalModule } from './components/JournalModule';
 import { ReportsModule } from './components/ReportsModule';
 import { AuditTrailModule } from './components/AuditTrailModule';
@@ -54,9 +55,17 @@ const MainApp = ({ currentUser, onLogout }) => {
         return <InventoryModule onOpenStockIn={() => setIsStockInOpen(true)} />;
       case 'bom':
         return <BOMModule />;
+      case 'opex':
+        return <OpexModule />;
       case 'journal':
+      case 'ledger':
+      case 'trial-balance':
+      case 'income-statement':
+      case 'balance-sheet':
+      case 'accounting':
         return (
           <JournalModule
+            initialSubTab={activeTab === 'accounting' ? 'journal' : activeTab}
             onOpenOpex={() => setIsOpexOpen(true)}
             onOpenStockIn={() => setIsStockInOpen(true)}
           />
