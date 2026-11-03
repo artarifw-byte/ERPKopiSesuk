@@ -3,6 +3,100 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import confetti from 'canvas-confetti';
 import { supabase } from '../lib/supabase';
 
+// Standard Chart of Accounts (COA) FSD v2.0 Specification
+export const STANDARD_COA_V2 = [
+  {
+    code: '101',
+    name: 'Kas & Bank (Kas Store / QRIS)',
+    type: 'ASSET',
+    classification: 'Aset (Aktiva Lancar)',
+    normalPosition: 'DEBET',
+    source: 'Penjualan POS/PO, Pembayaran OPEX/CAPEX',
+    description: 'Pusat penerimaan kas tunai, QRIS, dan pembayaran beban'
+  },
+  {
+    code: '102',
+    name: 'Persediaan Bahan Baku & Stok',
+    type: 'ASSET',
+    classification: 'Aset (Aktiva Lancar)',
+    normalPosition: 'DEBET',
+    source: 'Restock Bahan Baku Supplier, Deduksi BOM',
+    description: 'Nilai persediaan bahan baku dan kemasan berbasis formula BOM'
+  },
+  {
+    code: '103',
+    name: 'Aset Tetap Peralatan (CAPEX)',
+    type: 'ASSET',
+    classification: 'Aset (Aktiva Tetap)',
+    normalPosition: 'DEBET',
+    source: 'Pembelian Mesin, Grinder, Coolbox',
+    description: 'Investasi barang modal peralatan dengan masa manfaat panjang'
+  },
+  {
+    code: '104',
+    name: 'Aset Perlengkapan Toko (CAPEX)',
+    type: 'ASSET',
+    classification: 'Aset (Aktiva Tetap)',
+    normalPosition: 'DEBET',
+    source: 'Pembelian Meja CFD, Banner, Canopy Tent',
+    description: 'Investasi perlengkapan toko fisik dan event CFD'
+  },
+  {
+    code: '201',
+    name: 'Hutang Usaha / Vendor Supplier',
+    type: 'LIABILITY',
+    classification: 'Kewajiban (Liabilitas)',
+    normalPosition: 'KREDIT',
+    source: 'Pembelian Bahan Baku Kredit Tempo',
+    description: 'Kewajiban pembayaran pembelian tempo dari vendor supplier'
+  },
+  {
+    code: '301',
+    name: 'Modal Toko / Pemilik',
+    type: 'EQUITY',
+    classification: 'Ekuitas',
+    normalPosition: 'KREDIT',
+    source: 'Modal Terpusat Pemilik Toko',
+    description: 'Modal awal disetor pemilik usaha Kopi Sesuk'
+  },
+  {
+    code: '401',
+    name: 'Pendapatan Penjualan (Sales)',
+    type: 'REVENUE',
+    classification: 'Pendapatan (Revenue)',
+    normalPosition: 'KREDIT',
+    source: 'Penjualan PO Instansi & Penjualan CFD',
+    description: 'Hasil penjualan produk kopi PO schedule, CFD, dan POS kasir'
+  },
+  {
+    code: '501',
+    name: 'Beban Pokok Penjualan (HPP Kopi)',
+    type: 'EXPENSE',
+    classification: 'Beban (HPP/BPP)',
+    normalPosition: 'DEBET',
+    source: 'Pengurangan Bahan Baku Hasil Rekap BOM',
+    description: 'Biaya Pokok Penjualan berbasis deduksi resep BOM otomatis'
+  },
+  {
+    code: '502',
+    name: 'Beban Operasional Rutin (OPEX)',
+    type: 'EXPENSE',
+    classification: 'Beban Operasional',
+    normalPosition: 'DEBET',
+    source: 'Biaya Kebersihan, Keamanan, Sewa, Listrik',
+    description: 'Pengeluaran rutin operasional toko bulanan'
+  },
+  {
+    code: '504',
+    name: 'Beban Waste / Kerugian CFD',
+    type: 'EXPENSE',
+    classification: 'Beban Operasional',
+    normalPosition: 'DEBET',
+    source: 'Sisa Minuman CFD Tidak Terjual / Rusak',
+    description: 'Kerugian sisa minuman olahan event CFD yang tidak terjual'
+  }
+];
+
 const ERPContext = createContext();
 
 export const ERPProvider = ({ children }) => {
@@ -14,7 +108,7 @@ export const ERPProvider = ({ children }) => {
   const [toast, setToast] = useState(null);
 
   // States populated entirely from Supabase database
-  const [coa, setCoa] = useState([]);
+  const [coa, setCoa] = useState(STANDARD_COA_V2);
   const [materials, setMaterials] = useState([]);
   const [products, setProducts] = useState([]);
   const [bom, setBom] = useState([]);
@@ -155,19 +249,37 @@ export const ERPProvider = ({ children }) => {
 
       if (errMats) console.warn('Supabase fetch materials warning:', errMats.message);
 
-      // COA Map for fast naming
+      // Standardized COA Map & Merged List (FSD v2.0 Section 2)
       const coaMap = {};
-      const formattedCoa = (coaData || []).map(c => {
-        coaMap[c.code] = c.name;
-        return {
-          code: c.code,
-          name: c.name,
-          type: c.type,
-          desc: c.description || '',
-          description: c.description || ''
-        };
+      const mergedCoa = STANDARD_COA_V2.map(item => ({ ...item }));
+
+      (coaData || []).forEach(c => {
+        const existingIdx = mergedCoa.findIndex(sc => sc.code === c.code);
+        if (existingIdx > -1) {
+          mergedCoa[existingIdx] = {
+            ...mergedCoa[existingIdx],
+            name: c.name || mergedCoa[existingIdx].name,
+            desc: c.description || mergedCoa[existingIdx].source,
+            description: c.description || mergedCoa[existingIdx].description
+          };
+        } else {
+          mergedCoa.push({
+            code: c.code,
+            name: c.name,
+            type: c.type || 'EXPENSE',
+            classification: c.type === 'ASSET' ? 'Aset (Aktiva Lancar)' : (c.type === 'LIABILITY' ? 'Kewajiban (Liabilitas)' : (c.type === 'EQUITY' ? 'Ekuitas' : (c.type === 'REVENUE' ? 'Pendapatan (Revenue)' : 'Beban Operasional'))),
+            normalPosition: (c.type === 'LIABILITY' || c.type === 'EQUITY' || c.type === 'REVENUE') ? 'KREDIT' : 'DEBET',
+            source: c.description || 'Transaksi Operasional',
+            desc: c.description || '',
+            description: c.description || ''
+          });
+        }
       });
-      setCoa(formattedCoa);
+
+      mergedCoa.forEach(c => {
+        coaMap[c.code] = c.name;
+      });
+      setCoa(mergedCoa);
 
       // Format Materials
       const formattedMats = (matsData || []).map(formatMaterial);
@@ -1236,64 +1348,323 @@ export const ERPProvider = ({ children }) => {
     };
   };
 
+  // Helper filter entries by date/period
+  const isDateInPeriod = (dateStr, periodFilter, startDate, endDate) => {
+    if (!dateStr || periodFilter === 'ALL') return true;
+    const entryDate = new Date(dateStr);
+    const now = new Date();
+    if (periodFilter === 'THIS_MONTH') {
+      return entryDate.getMonth() === now.getMonth() && entryDate.getFullYear() === now.getFullYear();
+    } else if (periodFilter === 'LAST_MONTH') {
+      const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+      const lastYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+      return entryDate.getMonth() === lastMonth && entryDate.getFullYear() === lastYear;
+    } else if (periodFilter === 'THIS_YEAR') {
+      return entryDate.getFullYear() === now.getFullYear();
+    } else if (periodFilter === 'CUSTOM') {
+      if (startDate && dateStr < startDate) return false;
+      if (endDate && dateStr > endDate) return false;
+      return true;
+    }
+    return true;
+  };
+
+  // 1. Buku Besar (General Ledger) Calculation per Account (FSD v2.0 Section 3)
+  const calculateLedger = (accountCode, { periodFilter = 'ALL', startDate = '', endDate = '', searchQuery = '' } = {}) => {
+    const account = coa.find(c => c.code === accountCode) || {
+      code: accountCode,
+      name: accountCode,
+      normalPosition: 'DEBET',
+      classification: 'Akun Terpusat',
+      source: 'Operasional'
+    };
+
+    const isDebetNormal = (account.normalPosition || 'DEBET') === 'DEBET';
+    const sortedJournal = [...journal].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    let runningBalance = 0;
+    let totalDebits = 0;
+    let totalCredits = 0;
+    const entries = [];
+
+    sortedJournal.forEach(entry => {
+      if (!isDateInPeriod(entry.date, periodFilter, startDate, endDate)) return;
+
+      const matchingItems = (entry.items || []).filter(it => (it.accountCode || it.account_code) === accountCode);
+      if (matchingItems.length === 0) return;
+
+      matchingItems.forEach(item => {
+        const deb = Number(item.debit) || 0;
+        const cred = Number(item.credit) || 0;
+        totalDebits += deb;
+        totalCredits += cred;
+
+        if (isDebetNormal) {
+          runningBalance += (deb - cred);
+        } else {
+          runningBalance += (cred - deb);
+        }
+
+        const q = (searchQuery || '').toLowerCase().trim();
+        const matchesSearch = !q ||
+          (entry.ref || '').toLowerCase().includes(q) ||
+          (entry.description || '').toLowerCase().includes(q) ||
+          (entry.date || '').toLowerCase().includes(q);
+
+        if (matchesSearch) {
+          entries.push({
+            id: `${entry.id}-${item.id || Math.random()}`,
+            entryId: entry.id,
+            date: entry.date,
+            ref: entry.ref || '',
+            description: entry.description || '',
+            debit: deb,
+            credit: cred,
+            balance: runningBalance
+          });
+        }
+      });
+    });
+
+    return {
+      account,
+      entries,
+      totalDebits,
+      totalCredits,
+      endingBalance: runningBalance,
+      isDebetNormal
+    };
+  };
+
+  // 2. Neraca Saldo (Trial Balance) Calculation (FSD v2.0 Section 3)
+  const calculateTrialBalance = ({ periodFilter = 'ALL', startDate = '', endDate = '', asOfDate = '' } = {}) => {
+    let grandDebitMutations = 0;
+    let grandCreditMutations = 0;
+    let grandEndingDebit = 0;
+    let grandEndingCredit = 0;
+
+    const rows = coa.map(account => {
+      let totalDebits = 0;
+      let totalCredits = 0;
+
+      journal.forEach(entry => {
+        if (asOfDate && entry.date > asOfDate) return;
+        if (!asOfDate && !isDateInPeriod(entry.date, periodFilter, startDate, endDate)) return;
+
+        (entry.items || []).forEach(it => {
+          if ((it.accountCode || it.account_code) === account.code) {
+            totalDebits += Number(it.debit) || 0;
+            totalCredits += Number(it.credit) || 0;
+          }
+        });
+      });
+
+      const isDebetNormal = (account.normalPosition || 'DEBET') === 'DEBET';
+      let saldoDebet = 0;
+      let saldoKredit = 0;
+
+      if (isDebetNormal) {
+        if (totalDebits >= totalCredits) {
+          saldoDebet = totalDebits - totalCredits;
+        } else {
+          saldoKredit = totalCredits - totalDebits;
+        }
+      } else {
+        if (totalCredits >= totalDebits) {
+          saldoKredit = totalCredits - totalDebits;
+        } else {
+          saldoDebet = totalDebits - totalCredits;
+        }
+      }
+
+      grandDebitMutations += totalDebits;
+      grandCreditMutations += totalCredits;
+      grandEndingDebit += saldoDebet;
+      grandEndingCredit += saldoKredit;
+
+      return {
+        ...account,
+        totalDebits,
+        totalCredits,
+        saldoDebet,
+        saldoKredit,
+        isDebetNormal
+      };
+    });
+
+    const isMutationBalanced = Math.round(grandDebitMutations) === Math.round(grandCreditMutations);
+    const isEndingBalanced = Math.round(grandEndingDebit) === Math.round(grandEndingCredit);
+
+    return {
+      rows,
+      grandDebitMutations,
+      grandCreditMutations,
+      grandEndingDebit,
+      grandEndingCredit,
+      isBalanced: isMutationBalanced && isEndingBalanced,
+      difference: Math.abs(grandEndingDebit - grandEndingCredit)
+    };
+  };
+
+  // 3. Laporan Neraca (Balance Sheet): Aset = Kewajiban + Ekuitas (FSD v2.0 Section 3)
+  const calculateBalanceSheet = (asOfDate = null) => {
+    let kas = 0; // 101
+    let persediaan = 0; // 102
+    let peralatan = 0; // 103
+    let perlengkapan = 0; // 104
+    let hutang = 0; // 201
+    let modal = 0; // 301
+
+    let revenue = 0; // 401
+    let hpp = 0; // 501
+    let opexRutin = 0; // 502
+    let opexWaste = 0; // 504
+    let opexLain = 0; // 601
+
+    journal.forEach(entry => {
+      if (asOfDate && entry.date > asOfDate) return;
+
+      (entry.items || []).forEach(it => {
+        const code = String(it.accountCode || it.account_code || '');
+        const deb = Number(it.debit) || 0;
+        const cred = Number(it.credit) || 0;
+
+        if (code === '101') kas += (deb - cred);
+        else if (code === '102') persediaan += (deb - cred);
+        else if (code === '103') peralatan += (deb - cred);
+        else if (code === '104') perlengkapan += (deb - cred);
+        else if (code === '201' || code === '202') hutang += (cred - deb);
+        else if (code === '301') modal += (cred - deb);
+        else if (code === '401') revenue += (cred - deb);
+        else if (code === '501') hpp += (deb - cred);
+        else if (code === '502') opexRutin += (deb - cred);
+        else if (code === '504') opexWaste += (deb - cred);
+        else if (code === '601') opexLain += (deb - cred);
+      });
+    });
+
+    // Fallback modal jika belum ada jurnal penyerahan modal
+    if (modal === 0) modal = 1000000;
+
+    const currentNetProfit = revenue - hpp - (opexRutin + opexWaste + opexLain);
+    const asetLancar = kas + persediaan;
+    const asetTetap = peralatan + perlengkapan;
+    const totalAset = asetLancar + asetTetap;
+
+    const totalKewajiban = hutang;
+    const totalEkuitas = modal + currentNetProfit;
+    const totalPasiva = totalKewajiban + totalEkuitas;
+
+    const difference = Math.abs(Math.round(totalAset) - Math.round(totalPasiva));
+    const isBalanced = difference === 0;
+
+    return {
+      kas,
+      persediaan,
+      asetLancar,
+      peralatan,
+      perlengkapan,
+      asetTetap,
+      totalAset,
+      hutang,
+      totalKewajiban,
+      modal,
+      currentNetProfit,
+      totalEkuitas,
+      totalPasiva,
+      difference,
+      isBalanced
+    };
+  };
+
+  // 4. Laporan Laba Rugi (Income Statement): Revenue - HPP - OPEX = Net Profit (FSD v2.0 Section 3)
+  const calculateIncomeStatement = ({ periodFilter = 'ALL', startDate = '', endDate = '' } = {}) => {
+    let revenue = 0;
+    let hpp = 0;
+    let opexRutin = 0;
+    let opexWaste = 0;
+    let opexLain = 0;
+
+    journal.forEach(entry => {
+      if (!isDateInPeriod(entry.date, periodFilter, startDate, endDate)) return;
+
+      (entry.items || []).forEach(it => {
+        const code = String(it.accountCode || it.account_code || '');
+        const deb = Number(it.debit) || 0;
+        const cred = Number(it.credit) || 0;
+
+        if (code === '401') revenue += (cred - deb);
+        else if (code === '501') hpp += (deb - cred);
+        else if (code === '502') opexRutin += (deb - cred);
+        else if (code === '504') opexWaste += (deb - cred);
+        else if (code === '601') opexLain += (deb - cred);
+      });
+    });
+
+    const grossProfit = revenue - hpp;
+    const totalOpex = opexRutin + opexWaste + opexLain;
+    const netProfit = grossProfit - totalOpex;
+    const grossMarginPercent = revenue > 0 ? ((grossProfit / revenue) * 100).toFixed(1) : '0';
+    const netMarginPercent = revenue > 0 ? ((netProfit / revenue) * 100).toFixed(1) : '0';
+
+    return {
+      revenue,
+      hpp,
+      grossProfit,
+      opexRutin,
+      opexWaste,
+      opexLain,
+      totalOpex,
+      netProfit,
+      grossMarginPercent,
+      netMarginPercent,
+      isProfit: netProfit >= 0
+    };
+  };
+
   const resetData = async () => {
     try {
-      showToast('Menghapus semua data transaksi...', 'info');
+      showToast('Menghapus semua data...', 'info');
 
-      // Urutan delete penting: child tables first (foreign key constraints)
-      const deleteResults = await Promise.allSettled([
+      // Step 1: leaf / child tables (FK dependencies)
+      await Promise.allSettled([
         supabase.from('journal_items').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
         supabase.from('order_items').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
         supabase.from('inventory_transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
         supabase.from('audit_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('bom_recipes').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
       ]);
 
-      // Setelah child tables bersih, hapus parent tables
+      // Step 2: parent transaction tables
       await Promise.allSettled([
         supabase.from('journal_entries').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
         supabase.from('orders').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
         supabase.from('opex_expenses').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
       ]);
 
-      // Log errors jika ada
-      deleteResults.forEach((r, i) => {
-        if (r.status === 'rejected') console.warn(`Delete step ${i} failed:`, r.reason);
-      });
+      // Step 3: master data (product variants before products, raw_materials)
+      await Promise.allSettled([
+        supabase.from('product_variants').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+      ]);
+
+      await Promise.allSettled([
+        supabase.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('raw_materials').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+      ]);
 
       // Bersihkan localStorage audit
       localStorage.removeItem('ks_audit_logs');
+
+      // Reset semua state lokal ke kosong
       setAuditLogs([]);
-
-      // Reload semua data dari Supabase
-      const [
-        { data: coaData },
-        { data: materialsData },
-        { data: productsData },
-        { data: variantsData },
-        { data: bomData },
-      ] = await Promise.all([
-        supabase.from('chart_of_accounts').select('*').order('code'),
-        supabase.from('raw_materials').select('*').order('name'),
-        supabase.from('products').select('*').order('name'),
-        supabase.from('product_variants').select('*'),
-        supabase.from('bom_recipes').select('*'),
-      ]);
-
-      // Update state lokal: data master tetap, data transaksi dikosongkan
-      if (coaData) setCoa(coaData);
-      if (materialsData) setMaterials(materialsData);
-      if (productsData && variantsData) {
-        setProducts(productsData.map(p => ({
-          ...p,
-          variants: variantsData.filter(v => v.product_id === p.id)
-        })));
-      }
-      if (bomData) setBom(bomData);
+      setMaterials([]);
+      setProducts([]);
+      setBom([]);
       setOrders([]);
       setOpex([]);
       setJournal([]);
 
-      showToast('✅ Semua data transaksi berhasil dihapus. Database bersih!', 'success');
+      showToast('✅ Semua data berhasil dihapus. Database pure kosong!', 'success');
     } catch (err) {
       console.error('resetData error:', err);
       showToast('Gagal reset data: ' + (err.message || 'Unknown error'), 'error');
@@ -1340,6 +1711,10 @@ export const ERPProvider = ({ children }) => {
         deleteBOMItem,
         saveVariantRecipe,
         calculateFinancials,
+        calculateLedger,
+        calculateTrialBalance,
+        calculateBalanceSheet,
+        calculateIncomeStatement,
         resetData,
         calculateBundle1LPricing,
         isOneLiter

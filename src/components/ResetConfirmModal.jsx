@@ -74,7 +74,7 @@ export const ResetConfirmModal = ({ isOpen, onClose, onConfirm }) => {
         {/* Body */}
         <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <p style={{ fontSize: '0.875rem', color: '#334155', lineHeight: 1.6, margin: 0 }}>
-            Seluruh data transaksi akan dihapus permanen dari database Supabase.
+            <strong>Semua data</strong> akan dihapus permanen dari database Supabase. Database akan menjadi pure kosong.
           </p>
 
           <div style={{
@@ -86,27 +86,29 @@ export const ResetConfirmModal = ({ isOpen, onClose, onConfirm }) => {
             color: '#7F1D1D',
             lineHeight: 1.6
           }}>
-            <strong style={{ color: '#991B1B', display: 'block', marginBottom: '0.4rem' }}>🗑️ Akan di-DELETE (data transaksi):</strong>
+            <strong style={{ color: '#991B1B', display: 'block', marginBottom: '0.4rem' }}>🗑️ Semua tabel akan di-DELETE:</strong>
             <ul style={{ margin: '0 0 0 1rem', padding: 0 }}>
               <li>orders & order_items</li>
               <li>journal_entries & journal_items</li>
-              <li>opex_expenses</li>
-              <li>inventory_transactions</li>
+              <li>opex_expenses & inventory_transactions</li>
+              <li>bom_recipes</li>
+              <li>product_variants & products</li>
+              <li>raw_materials (bahan baku)</li>
               <li>audit_logs</li>
             </ul>
           </div>
 
           <div style={{
             padding: '0.75rem 1rem',
-            background: '#F0FDF4',
-            border: '1.5px solid #86EFAC',
+            background: '#FFFBEB',
+            border: '1.5px solid #FCD34D',
             borderRadius: '0.75rem',
             fontSize: '0.8125rem',
-            color: '#14532D',
+            color: '#78350F',
             lineHeight: 1.5
           }}>
-            <strong style={{ color: '#15803D', display: 'block', marginBottom: '0.25rem' }}>✅ Tetap aman (data master):</strong>
-            Produk, bahan baku, BOM resep, COA, dan harga pokok tidak akan terpengaruh.
+            <strong style={{ color: '#92400E', display: 'block', marginBottom: '0.25rem' }}>⚠️ Tidak terpengaruh:</strong>
+            Chart of Accounts (COA) — data akuntansi tetap tersimpan.
           </div>
         </div>
 

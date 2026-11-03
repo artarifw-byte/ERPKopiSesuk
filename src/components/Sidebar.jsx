@@ -7,6 +7,10 @@ import {
   PackageCheck,
   UtensilsCrossed,
   BookOpenCheck,
+  BookOpen,
+  Scale,
+  TrendingUp,
+  Landmark,
   BarChart3,
   Database,
   ShieldCheck,
@@ -27,73 +31,109 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
     if (status === 'REORDER') reorderCount++;
   });
 
-  const menuItems = [
+  const menuGroups = [
     {
-      id: 'dashboard',
-      label: 'Dashboard ERP',
-      icon: LayoutDashboard,
-      roles: ['super_admin', 'store_admin', 'kasir', 'finance']
+      title: 'OPERASIONAL TOKO',
+      items: [
+        {
+          id: 'dashboard',
+          label: 'Dashboard ERP',
+          icon: LayoutDashboard,
+          roles: ['super_admin', 'store_admin', 'kasir', 'finance']
+        },
+        {
+          id: 'pos',
+          label: 'POS Sales Kasir',
+          icon: ShoppingCart,
+          roles: ['super_admin', 'store_admin', 'kasir']
+        },
+        {
+          id: 'orders',
+          label: 'PO Schedule & Sales',
+          icon: CalendarCheck,
+          roles: ['super_admin', 'store_admin', 'kasir']
+        },
+        {
+          id: 'inventory',
+          label: 'Stok & Inventory Control',
+          icon: PackageCheck,
+          roles: ['super_admin', 'store_admin'],
+          alertCount: criticalCount + reorderCount
+        },
+        {
+          id: 'bom',
+          label: 'Resep BOM (Takaran)',
+          icon: UtensilsCrossed,
+          roles: ['super_admin', 'store_admin']
+        },
+        {
+          id: 'opex',
+          label: 'Beban OPEX & CAPEX',
+          icon: ReceiptText,
+          roles: ['super_admin', 'store_admin', 'finance'],
+          badge: 'Baru'
+        }
+      ]
     },
     {
-      id: 'pos',
-      label: 'POS Sales Kasir',
-      icon: ShoppingCart,
-      roles: ['super_admin', 'store_admin', 'kasir'],
-      badge: 'Kasir'
+      title: 'MODUL AKUNTANSI & KEUANGAN',
+      isAccountingGroup: true,
+      items: [
+        {
+          id: 'journal',
+          label: 'Jurnal Umum (General Journal)',
+          icon: BookOpenCheck,
+          roles: ['super_admin', 'finance']
+        },
+        {
+          id: 'ledger',
+          label: 'Buku Besar (General Ledger)',
+          icon: BookOpen,
+          roles: ['super_admin', 'finance']
+        },
+        {
+          id: 'trial-balance',
+          label: 'Neraca Saldo (Trial Balance)',
+          icon: Scale,
+          roles: ['super_admin', 'finance']
+        },
+        {
+          id: 'income-statement',
+          label: 'Laporan Laba Rugi',
+          icon: TrendingUp,
+          roles: ['super_admin', 'finance']
+        },
+        {
+          id: 'balance-sheet',
+          label: 'Laporan Neraca',
+          icon: Landmark,
+          roles: ['super_admin', 'finance']
+        }
+      ]
     },
     {
-      id: 'orders',
-      label: 'PO Schedule & Sales',
-      icon: CalendarCheck,
-      roles: ['super_admin', 'store_admin', 'kasir'],
-      badge: 'PO / CFD'
-    },
-    {
-      id: 'inventory',
-      label: 'Stok & Inventory Control',
-      icon: PackageCheck,
-      roles: ['super_admin', 'store_admin'],
-      alertCount: criticalCount + reorderCount
-    },
-    {
-      id: 'bom',
-      label: 'Resep BOM (Takaran)',
-      icon: UtensilsCrossed,
-      roles: ['super_admin', 'store_admin']
-    },
-    {
-      id: 'opex',
-      label: 'Beban OPEX & CAPEX',
-      icon: ReceiptText,
-      roles: ['super_admin', 'store_admin', 'finance'],
-      badge: 'Baru'
-    },
-    {
-      id: 'journal',
-      label: 'Jurnal Akuntansi',
-      icon: BookOpenCheck,
-      roles: ['super_admin', 'finance'],
-      badge: 'Double-Entry'
-    },
-    {
-      id: 'reports',
-      label: 'Laporan & BEP',
-      icon: BarChart3,
-      roles: ['super_admin', 'finance']
-    },
-    {
-      id: 'audit',
-      label: 'Audit Trail & Log',
-      icon: History,
-      roles: ['super_admin', 'store_admin', 'kasir', 'finance'],
-      badge: 'Audit'
-    },
-    {
-      id: 'ddl',
-      label: 'Supabase DDL Schema',
-      icon: Database,
-      roles: ['super_admin', 'store_admin', 'kasir', 'finance'],
-      highlight: true
+      title: 'ANALISIS & SISTEM',
+      items: [
+        {
+          id: 'reports',
+          label: 'Laporan & BEP Analisis',
+          icon: BarChart3,
+          roles: ['super_admin', 'finance']
+        },
+        {
+          id: 'audit',
+          label: 'Audit Trail & Log',
+          icon: History,
+          roles: ['super_admin', 'store_admin', 'kasir', 'finance']
+        },
+        {
+          id: 'ddl',
+          label: 'Supabase DDL Schema',
+          icon: Database,
+          roles: ['super_admin', 'store_admin', 'kasir', 'finance'],
+          highlight: true
+        }
+      ]
     }
   ];
 
@@ -121,57 +161,103 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
         </div>
         <div className="flex items-baseline gap-2">
           <h1 className="font-black text-base tracking-tight text-slate-900 leading-none whitespace-nowrap">Kopi Sesuk</h1>
-          <span className="text-xs font-extrabold text-sky-600 whitespace-nowrap">ERP v1.1</span>
+          <span className="text-xs font-extrabold text-sky-600 whitespace-nowrap">ERP v2.0</span>
         </div>
       </div>
 
-      {/* Navigation Menu */}
+      {/* Navigation Menu with Logical Categorized Groups (FSD v2.0 Section 3) */}
       <div className="sidebar-menu">
-        <div className="sidebar-group-title">
-          MENU UTAMA
-        </div>
-
-        {menuItems.map((item) => {
-          const isAllowed = item.roles.includes(userRole);
-          const isActive = activeTab === item.id;
-          const Icon = item.icon;
-
-          if (!isAllowed) {
-            return null;
-          }
+        {menuGroups.map((group, groupIdx) => {
+          const visibleItems = group.items.filter(item => item.roles.includes(userRole));
+          if (visibleItems.length === 0) return null;
 
           return (
-            <button
-              key={item.id}
-              onClick={() => {
-                setActiveTab(item.id);
-                if (onCloseMobile) onCloseMobile();
-              }}
-              className={`sidebar-nav-btn ${isActive ? 'active' : ''}`}
-            >
-              <div className="flex items-center gap-3 shrink-0">
-                <Icon className={`w-5 h-5 shrink-0 ${isActive ? 'text-white' : item.highlight ? 'text-sky-600' : 'text-slate-500'}`} />
-                <span className="whitespace-nowrap font-bold text-xs">{item.label}</span>
-              </div>
-
-              <div className="shrink-0 ml-3">
-                {item.alertCount > 0 && (
-                  <span className={`sidebar-badge-pill ${
-                    isActive ? 'bg-white text-sky-700 font-bold' : 'bg-amber-100 text-amber-800 font-bold'
-                  }`}>
-                    {item.alertCount} Warning
+            <div key={groupIdx} style={{ marginBottom: '0.875rem' }}>
+              <div
+                className="sidebar-group-title"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0.4rem 0.75rem',
+                  fontSize: '0.65rem',
+                  fontWeight: 900,
+                  letterSpacing: '0.08em',
+                  color: group.isAccountingGroup ? '#0284C7' : '#94A3B8'
+                }}
+              >
+                <span>{group.title}</span>
+                {group.isAccountingGroup && (
+                  <span style={{
+                    fontSize: '0.6rem',
+                    fontWeight: 900,
+                    padding: '0.1rem 0.35rem',
+                    borderRadius: '0.25rem',
+                    background: '#E0F2FE',
+                    color: '#0369A1'
+                  }}>
+                    v2.0
                   </span>
                 )}
-
-                {item.badge && !item.alertCount && (
-                  <span className={`sidebar-badge-pill ${
-                    isActive ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 text-slate-600 font-bold'
-                  }`}>
-                    {item.badge}
-                  </span>
-                )}
               </div>
-            </button>
+
+              {visibleItems.map(item => {
+                const isActive = activeTab === item.id;
+                const Icon = item.icon;
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id);
+                      if (onCloseMobile) onCloseMobile();
+                    }}
+                    className={`sidebar-nav-btn ${isActive ? 'active' : ''}`}
+                    title={item.label}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', minWidth: 0, flex: 1, marginRight: '0.5rem' }}>
+                      <Icon
+                        style={{
+                          width: '18px',
+                          height: '18px',
+                          flexShrink: 0,
+                          color: isActive ? '#FFFFFF' : item.highlight ? '#0284C7' : '#64748B'
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontWeight: 700,
+                          fontSize: '0.8125rem',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {item.label}
+                      </span>
+                    </div>
+
+                    {(item.alertCount > 0 || item.badge) && (
+                      <div className="shrink-0 ml-2">
+                        {item.alertCount > 0 ? (
+                          <span className={`sidebar-badge-pill ${
+                            isActive ? 'bg-white text-sky-700 font-bold' : 'bg-amber-100 text-amber-800 font-bold'
+                          }`}>
+                            {item.alertCount} Warning
+                          </span>
+                        ) : (
+                          <span className={`sidebar-badge-pill ${
+                            isActive ? 'bg-sky-600 text-white font-bold' : 'bg-slate-100 text-slate-600 font-bold'
+                          }`}>
+                            {item.badge}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           );
         })}
       </div>

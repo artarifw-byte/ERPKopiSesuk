@@ -19,7 +19,9 @@ export const DDLViewerModal = ({ isOpen, onClose }) => {
 
   const ddlScript = `-- =============================================================================
 -- KOPI SESUK CENTRALIZED ERP - SUPABASE POSTGRESQL DDL & INITIAL SEED DATA
--- Document ID: FSD-KS-2026-V1
+-- Document ID: FSD-KS-2026-V2.0
+-- Versi Status: v2.0 (Major Release)
+-- Tanggal Efektif: November 2026
 -- Target Database: Supabase / PostgreSQL 14+
 -- =============================================================================
 

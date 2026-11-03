@@ -1,6 +1,8 @@
 -- =============================================================================
 -- KOPI SESUK CENTRALIZED ERP - SUPABASE POSTGRESQL DDL & INITIAL SEED DATA
--- Document ID: FSD-KS-2026-V1
+-- Document ID: FSD-KS-2026-V2.0
+-- Versi Status: v2.0 (Major Release)
+-- Tanggal Efektif: November 2026
 -- Target Database: Supabase / PostgreSQL 14+
 -- =============================================================================
 
@@ -184,7 +186,7 @@ WITH journal_summary AS (
     SELECT 
         COALESCE(SUM(CASE WHEN account_code = '401' THEN credit - debit ELSE 0 END), 0) AS total_revenue,
         COALESCE(SUM(CASE WHEN account_code = '501' THEN debit - credit ELSE 0 END), 0) AS total_hpp,
-        COALESCE(SUM(CASE WHEN account_code = '601' THEN debit - credit ELSE 0 END), 0) AS total_opex
+        COALESCE(SUM(CASE WHEN account_code IN ('502', '504', '601') THEN debit - credit ELSE 0 END), 0) AS total_opex
     FROM journal_items
 ),
 orders_summary AS (
@@ -212,20 +214,21 @@ WITH accounts AS (
 SELECT
     COALESCE(SUM(CASE WHEN account_code = '101' THEN net_debit ELSE 0 END), 0) AS kas,
     COALESCE(SUM(CASE WHEN account_code = '102' THEN net_debit ELSE 0 END), 0) AS persediaan,
-    COALESCE(SUM(CASE WHEN account_code = '103' THEN net_debit ELSE 0 END), 0) AS aset,
-    COALESCE(SUM(CASE WHEN account_code IN ('101', '102', '103') THEN net_debit ELSE 0 END), 0) AS total_aktiva,
+    COALESCE(SUM(CASE WHEN account_code = '103' THEN net_debit ELSE 0 END), 0) AS aset_peralatan,
+    COALESCE(SUM(CASE WHEN account_code = '104' THEN net_debit ELSE 0 END), 0) AS aset_perlengkapan,
+    COALESCE(SUM(CASE WHEN account_code IN ('101', '102', '103', '104') THEN net_debit ELSE 0 END), 0) AS total_aktiva,
     COALESCE(SUM(CASE WHEN account_code IN ('201', '202', '203') THEN -net_debit ELSE 0 END), 0) AS hutang_dagang,
     COALESCE(SUM(CASE WHEN account_code = '301' THEN -net_debit ELSE 0 END), 0) AS modal,
     (
         COALESCE(SUM(CASE WHEN account_code = '401' THEN -net_debit ELSE 0 END), 0)
-        - COALESCE(SUM(CASE WHEN account_code IN ('501', '601') THEN net_debit ELSE 0 END), 0)
+        - COALESCE(SUM(CASE WHEN account_code IN ('501', '502', '504', '601') THEN net_debit ELSE 0 END), 0)
     ) AS laba_rugi_bersih,
     (
         COALESCE(SUM(CASE WHEN account_code IN ('201', '202', '203') THEN -net_debit ELSE 0 END), 0)
         + COALESCE(SUM(CASE WHEN account_code = '301' THEN -net_debit ELSE 0 END), 0)
         + (
             COALESCE(SUM(CASE WHEN account_code = '401' THEN -net_debit ELSE 0 END), 0)
-            - COALESCE(SUM(CASE WHEN account_code IN ('501', '601') THEN net_debit ELSE 0 END), 0)
+            - COALESCE(SUM(CASE WHEN account_code IN ('501', '502', '504', '601') THEN net_debit ELSE 0 END), 0)
         )
     ) AS total_passiva
 FROM accounts;

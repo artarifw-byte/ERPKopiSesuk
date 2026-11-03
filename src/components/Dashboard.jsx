@@ -143,17 +143,17 @@ export const Dashboard = ({ onOpenNewOrder, onOpenStockIn, onOpenOpex, onOpenDDL
               letterSpacing: '0.02em',
               color: '#ffffff'
             }}>
-              Web & Mobile ERP System
+              ERP v2.0 (Major Release)
             </span>
             <span style={{ fontSize: '0.75rem', color: '#BAE6FD', fontWeight: 600 }}>
-              Oktober 2026
+              November 2026 • General Ledger & Centralized Accounting
             </span>
           </div>
           <h2 style={{ fontSize: '1.625rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.02em', margin: '0 0 0.375rem 0' }}>
-            Sistem ERP Terpusat — Kopi Sesuk
+            Sistem ERP Terpusat — Kopi Sesuk v2.0
           </h2>
           <p style={{ fontSize: '0.875rem', color: '#E0F2FE', maxWidth: '42rem', lineHeight: 1.6, fontWeight: 500, margin: 0 }}>
-            Manajemen Stok Terpusat, Kalkulasi BOM Porsi & Botol 1L, Pemrosesan Jadwal PO/CFD, serta Otomatisasi Akuntansi Double-Entry.
+            Modul Utama Akuntansi & Buku Besar Mandiri, Manajemen Stok Terpusat, Kalkulasi BOM Porsi & Botol 1L, Pemrosesan Jadwal PO/CFD, serta Otomatisasi Double-Entry Bookkeeping.
           </p>
         </div>
       </div>

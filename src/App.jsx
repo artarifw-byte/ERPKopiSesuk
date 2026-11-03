@@ -58,8 +58,14 @@ const MainApp = ({ currentUser, onLogout }) => {
       case 'opex':
         return <OpexModule />;
       case 'journal':
+      case 'ledger':
+      case 'trial-balance':
+      case 'income-statement':
+      case 'balance-sheet':
+      case 'accounting':
         return (
           <JournalModule
+            initialSubTab={activeTab === 'accounting' ? 'journal' : activeTab}
             onOpenOpex={() => setIsOpexOpen(true)}
             onOpenStockIn={() => setIsStockInOpen(true)}
           />
